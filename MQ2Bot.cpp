@@ -64,7 +64,7 @@ extern char PLUGIN_NAME[MAX_PATH];
 
 #endif
 */
-char PLUGIN_NAME[MAX_PATH] = "MQ2Bot"; // this needs reenabled when not using mmobugs source code
+// char PLUGIN_NAME[MAX_PATH] = "MQ2Bot"; // this needs reenabled when not using mmobugs source code
 PreSetup("MQ2Bot");
 
 // defines
@@ -1438,11 +1438,12 @@ void CheckMemmedSpells()
 							vMemmedSpells[nGem].PreviousID = vMemmedSpells[nGem].ID;
 							strcpy_s(vMemmedSpells[nGem].SpellName, pSpell->Name);
 							vMemmedSpells[nGem].ID = pSpell->ID;
-							_itoa_s(nGem, szTemp, MAX_STRING, 10);
+							_itoa_s(nGem+1, szTemp, MAX_STRING, 10);
 							strcpy_s(vMemmedSpells[nGem].Gem, szTemp);
 							SpellType(pSpell);
 							vMemmedSpells[nGem].CheckFunc = NULL; // temp code this needs replaced once i dont crash
-							strcpy_s(vMemmedSpells[nGem].SpellCat, spellType);
+							strcpy_s(vMemmedSpells[nGem].SpellCat, spellCat);
+							strcpy_s(vMemmedSpells[nGem].SpellType, spellType);
 							vMemmedSpells[nGem].SpellTypeOption = spellTypeInt;
 							int defStartAt = 0, defUse = 0, defStopAt = 0, defPriority = 0, defNamedOnly = 0, defUseOnce = 0, defForceCast = 0;
 							for (int x = 0; DefaultSection[x]; x++)
@@ -1964,10 +1965,6 @@ void SpellType(PSPELL pSpell)
 	if (pSpell->Category == 132 || pSpell->Subcategory == 132 || pSpell->Category == 71) {
 		strcpy_s(spellType, "Aura"); spellTypeInt = ::OPTIONS::AURA; return;
 	}
-	SpellCategory(pSpell);
-	if (spellCat != "Unknown") {
-		strcpy_s(spellType, spellCat); spellTypeInt = ::OPTIONS::BUFF;  return;
-	}
 	if (pSpell->Category == 13 || pSpell->Subcategory == 13) {
 		strcpy_s(spellType, "Charm"); spellTypeInt = ::OPTIONS::CHARM;  return;
 	}
@@ -2057,6 +2054,15 @@ void SpellType(PSPELL pSpell)
 	}
 	if (pSpell->Subcategory == 104 && pSpell->Category == 69 && strstr(pSpell->Extra, "Rk") || pSpell->Subcategory == 99 && (GetCharInfo()->pSpawn->mActorClient.Class == 12 || GetCharInfo()->pSpawn->mActorClient.Class == 2) || pSpell->Subcategory == 139) {
 		strcpy_s(spellType, "Swarm");		spellTypeInt = ::OPTIONS::SWARM; return;
+	}
+	SpellCategory(pSpell);
+	if (spellCat != "Unknown") {
+		if (pSpell->TargetType == 6 || pSpell->TargetType == 41) {
+			strcpy_s(spellType, "SelfBuff"); spellTypeInt = ::OPTIONS::SELFBUFF;  return;
+		}
+		if (pSpell->TargetType != 6 && pSpell->TargetType != 41) {
+			strcpy_s(spellType, "Buff"); spellTypeInt = ::OPTIONS::BUFF;  return;
+		}
 	}
 }
 
