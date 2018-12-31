@@ -1964,6 +1964,10 @@ void SpellType(PSPELL pSpell)
 	if (pSpell->Category == 132 || pSpell->Subcategory == 132 || pSpell->Category == 71) {
 		strcpy_s(spellType, "Aura"); spellTypeInt = ::OPTIONS::AURA; return;
 	}
+	SpellCategory(pSpell);
+	if (spellCat != "Unknown") {
+		strcpy_s(spellType, spellCat); spellTypeInt = ::OPTIONS::BUFF;  return;
+	}
 	if (pSpell->Category == 13 || pSpell->Subcategory == 13) {
 		strcpy_s(spellType, "Charm"); spellTypeInt = ::OPTIONS::CHARM;  return;
 	}
