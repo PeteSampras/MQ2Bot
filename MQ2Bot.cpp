@@ -130,6 +130,7 @@ typedef struct _Spawns
 	vector<_BotSpell>	vSpellList;
 	char				SpawnBuffList[MAX_STRING];
 	DWORD				ID;
+	int					PetID; //ID of any pet
 	bool				Add; // is this a confirmed add?
 	PSPAWNINFO			Spawn;
 	SPAWNINFO			SpawnCopy;
@@ -403,15 +404,11 @@ DWORD ChkCreateDir(char* pszDir)
 {
 	DWORD dwAtt = 0;
 	dwAtt = GetFileAttributes(pszDir);
-
 	if (FILE_ATTRIBUTE_DIRECTORY == dwAtt) return(dwAtt);
-
 	char  acDir[MAX_PATH];
 	strcpy_s(acDir, pszDir);
-
 	bool bCreateFolder = true;
 	static bool bIsFile = false;
-
 	char* pc = NULL;
 	pc = strrchr(acDir, '\\');
 
@@ -420,7 +417,6 @@ DWORD ChkCreateDir(char* pszDir)
 			bIsFile = true;
 			bCreateFolder = false;
 		}
-
 		*pc = (char)0;
 	}
 	else
@@ -638,7 +634,6 @@ int FindSpellAttrib(PSPELL pSpell, int attrib)
 		if (GetSpellAttrib(pSpell, slot) == attrib)
 			return slot;
 	}
-
 	return -1; // not found
 }
 
@@ -709,7 +704,6 @@ void PopulateIni(vector<_BotSpell> &v, char VectorName[MAX_STRING])
 			_itoa_s(atoi(v[i].If), szTemp, 10);
 			WritePrivateProfileString(INISection, szSpell, szTemp, INIFileName);
 		}
-
 		else
 			WritePrivateProfileString(INISection, szSpell, v[i].If, INIFileName);
 		sprintf_s(szSpell, "%s%dGem", VectorName, i);
@@ -718,12 +712,10 @@ void PopulateIni(vector<_BotSpell> &v, char VectorName[MAX_STRING])
 			_itoa_s(atoi(v[i].Gem), szTemp, 10);
 			WritePrivateProfileString(INISection, szSpell, szTemp, INIFileName);
 		}
-
 		else
 			WritePrivateProfileString(INISection, szSpell, v[i].Gem, INIFileName);
 		sprintf_s(szSpell, "%s%dUseOnce", VectorName, i);
 		_itoa_s(v[i].UseOnce, szTemp, 10);
-
 		sprintf_s(szSpell, "%s%dForceCast", VectorName, i);
 		_itoa_s(v[i].ForceCast, szTemp, 10);
 		WritePrivateProfileString(INISection, szSpell, szTemp, INIFileName);
@@ -968,7 +960,6 @@ void CheckAdds()
 			if (MQGetTickCount64() > AssistTimer)
 				doAssist = 1;
 		}
-
 		if (doAssist)
 		{
 			HideDoCommand(pChar->pSpawn, assist, FromPlugin);
@@ -1080,7 +1071,6 @@ void CheckAdds()
 			ParseMacroData(BodyTypeFix, MAX_STRING);
 			LastBodyID = vAdds[0].ID;
 		}
-
 	}
 	if (!vAdds.size())
 	{
@@ -1090,7 +1080,6 @@ void CheckAdds()
 		FightZ = 0;
 		WarpDistance = 0;
 	}
-
 	/* FixNote 20160728.1
 	Need to check vSpawn, if not there, insert vAdd to there, also double check the vAdds[i].Add flag.
 	*/
@@ -1152,6 +1141,9 @@ void CheckGroup()
 							gMember.Spawn = pGroupMember;
 							gMember.ID = pGroupMember->SpawnID;
 							gMember.State = STANDSTATE_DEAD;
+							gMember.PetID = 0;
+							if (pChar->pSpawn->PetID && pChar->pSpawn->PetID > 0)
+								gMember.PetID = pChar->pSpawn->PetID;
 							vGroup[i] = gMember;
 						}
 						if (pGroupMember && !pGroupMember->RespawnTimer && pGroupMember->StandState != STANDSTATE_DEAD)
@@ -1162,6 +1154,9 @@ void CheckGroup()
 								gMember.Spawn = pGroupMember;
 								gMember.ID = pGroupMember->SpawnID;
 								gMember.State = SPAWN_PLAYER;
+								gMember.PetID = 0;
+								if (pChar->pSpawn->PetID && pChar->pSpawn->PetID > 0)
+									gMember.PetID = pChar->pSpawn->PetID;
 								vGroup[i] = gMember;
 							}
 						}
@@ -1623,7 +1618,6 @@ void DiscCategory(PSPELL pSpell)
 			strcpy_s(spellCat, "Offense");
 			return;
 		}
-
 		if (attrib == 162 || attrib == 168 || attrib == 172 || attrib == 174
 			|| attrib == 175 || attrib == 188 || attrib == 320)
 		{
@@ -1724,7 +1718,6 @@ int FindSpellInfoForAttrib(PSPELL pSpell, ATTRIBSLOTS what, int attrib)
 	{
 	case ATTRIB:
 		return slot;
-
 	case BASE:
 		return GetSpellBase(pSpell, slot);
 	case BASE2:
@@ -2235,6 +2228,7 @@ void CreateDisc()
 	if (!InGameOK())
 		return;
 	vTemp.clear();
+	strcpy_s(CurrentRoutine, &(__FUNCTION__[6]));
 	// discs are special due to timer ID and how this detects, I really dont want to screw with how they are ordered, even in a custom ini scenario.
 	vector<PSPELL> tempSpell;
 	vector<int> tempLevel;
@@ -2352,6 +2346,7 @@ void CreateDisc()
 }
 void CreateGroup()
 {
+	strcpy_s(CurrentRoutine, &(__FUNCTION__[6]));
 	vGroup.clear();
 	_Spawns group;
 	group.ID = 0;
