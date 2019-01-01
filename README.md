@@ -22,24 +22,23 @@ Details on the old project can be found at.
 I’d love for you to help us improve this project. To help us keep this collection
 high quality, I request that contributions adhere to the following guidelines.
 
-- **Provide links to documentation** supporting the change you’re making.
-  Current, canonical documentation mentioning the files being ignored is best.
-  Posts from EQMule showing code/method changes are useful.
-  If documentation isn’t available to support your change, do the best you can
-  to explain what the files being ignored are for.
+- **Provide links to documentation** supporting the change you’re making when available.
+  Current, canonical documentation mentioning the data changes are useful so developers can understand changes more easily.
+  Posts from EQMule showing code/method changes are also useful.
+  If documentation isn’t available to support your change, do the best you can to explain the changes.
 
 - **Explain why you’re making a change**. Even if it seems self-evident, please
   take a sentence or two to tell us why your change or addition should happen.
   It’s especially helpful to articulate why this change applies to _everyone_
-  who works with the applicable technology, rather than just you or your team.
+  who uses the plugin, rather than just you or your team.
 
 - **Please consider the scope of your change**. If your change is specific to a
   certain function please remember that it may impact other functions you might not use.
   Please try to check any other functions that use the same data as your changed function
   to ensure they still work correctly.
 
-- **Please only modify _one template_ per pull request**. This helps keep pull
-  requests and feedback focused on a specific project or technology.
+- **Please only modify _one major change_ per pull request**. This helps keep pull
+  requests and feedback focused on a specific issue.
 
 In general, the more you can do to help us understand the change you’re making,
 the more likely we’ll be to accept your contribution quickly.
