@@ -64,7 +64,7 @@ extern char PLUGIN_NAME[MAX_PATH];
 
 #endif
 */
-// char PLUGIN_NAME[MAX_PATH] = "MQ2Bot"; // this needs reenabled when not using mmobugs source code
+char PLUGIN_NAME[MAX_PATH] = "MQ2Bot"; // this needs reenabled when not using mmobugs source code
 PreSetup("MQ2Bot");
 
 // defines
@@ -1950,6 +1950,7 @@ void SpellType(PSPELL pSpell)
 		return;
 	strcpy_s(spellType, "Unknown");
 	spellTypeInt = ZERO;
+	SpellCategory(pSpell); //renji: moved to top to ensure it fires before returns
 	if ((GetSpellAttribX(pSpell, 0) == 192 && GetSpellBase(pSpell, 0) > 0) || (GetSpellAttribX(pSpell, 4) == 192 && GetSpellBase(pSpell, 4) > 0)) {
 		strcpy_s(spellType, "Aggro"); spellTypeInt = ::OPTIONS::AGGRO; spellFunc = CheckAggro;  return;
 	}
@@ -2040,7 +2041,7 @@ void SpellType(PSPELL pSpell)
 	if (pSpell->Subcategory == 104 && pSpell->Category == 69 && strstr(pSpell->Extra, "Rk") || pSpell->Subcategory == 99 && (GetCharInfo()->pSpawn->mActorClient.Class == 12 || GetCharInfo()->pSpawn->mActorClient.Class == 2) || pSpell->Subcategory == 139) {
 		strcpy_s(spellType, "Swarm");		spellTypeInt = ::OPTIONS::SWARM; spellFunc = CheckSwarm;  return;
 	}
-	SpellCategory(pSpell);
+	//renji: call to SpellCategory moved to top
 	if (spellCat != "Unknown") {
 		if (pSpell->TargetType == 6 || pSpell->TargetType == 41) {
 			strcpy_s(spellType, "SelfBuff"); spellTypeInt = ::OPTIONS::SELFBUFF; spellFunc = CheckSelfBuff; return;
