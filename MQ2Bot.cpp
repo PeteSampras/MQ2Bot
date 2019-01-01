@@ -1503,6 +1503,9 @@ void CheckMemmedSpells()
 								WriteChatf("\arMQ2Bot\aw::\ayAdded: \aw%s (%s)", vMemmedSpells[nGem].SpellName, vMemmedSpells[nGem].SpellCat);
 							else
 								WriteChatf("\arMQ2Bot\aw::\amDetected: \aw%s (%s)", vMemmedSpells[nGem].SpellName, vMemmedSpells[nGem].SpellCat);
+							//renji:
+							//for loop was "return"-ing to avoid adding to master if found, which skips the sort call when change=true
+							bool bFoundSpell = false;
 							int vSize = vMaster.size();
 							for (int i = 0; i < vSize; i++)
 							{
@@ -1510,11 +1513,14 @@ void CheckMemmedSpells()
 								{
 									WriteChatf("\arMQ2Bot\aw::\amKnown: \aw%s (%s)", vMemmedSpells[nGem].SpellName, vMemmedSpells[nGem].SpellCat);
 									vMaster[i] = vMemmedSpells[nGem];
-									return;
+									bFoundSpell = true;
+									break;
+									//return;
 								}
 							}
-							if (vMemmedSpells[nGem].SpellTypeOption != ::OPTIONS::ZERO)
-								vMaster.push_back(vMemmedSpells[nGem]);
+							if (!bFoundSpell)
+								if (vMemmedSpells[nGem].SpellTypeOption != ::OPTIONS::ZERO)
+									vMaster.push_back(vMemmedSpells[nGem]);
 						}
 					}
 				}
@@ -2150,6 +2156,15 @@ void CreateAA()
 		sprintf_s(szSpell, "Spell%dName", i);
 		if (GetPrivateProfileString(INISection, szSpell, NULL, szTemp, MAX_STRING, INIFileName))
 		{
+			//renji: avoid double dipping from heal AA's, etc.
+			bool bFound = false;
+			for (int i = 0; szAA[i]; i++)
+				if (!_stricmp(szTemp, szAA[i]))
+				{
+					bFound = true;
+				}
+			if (!bFound) continue; //this spell is not in the AA list
+			//end
 			aaIndex = GetAAIndexByName(szTemp);
 			if (aaIndex > 0)
 			{
@@ -2157,6 +2172,7 @@ void CreateAA()
 				if (aa && GetSpellByID(aa->SpellID))
 				{
 					BotSpell spell;
+					spell.IniMatch = i; //renji: this wasn't set, causing AA to hijack the top spells
 					spell.Spell = GetSpellByID(aa->SpellID);
 					if (GetCharInfo()->pSpawn->mActorClient.Class == 3) // one off shit that is misnamed.  should probably double check to see if this is fixed now 20160717.
 						if (strstr(szTemp, "Inquisitor's Judg"))
@@ -2192,6 +2208,7 @@ void CreateAA()
 				if (aa && GetSpellByID(aa->SpellID) && (int)aa->ReuseTimer > 0)
 				{
 					BotSpell spell;
+					spell.IniMatch = -1; //renji: temp workaround so doesn't match Spell0
 					spell.Spell = GetSpellByID(aa->SpellID);
 					strcpy_s(spell.SpellName, szTemp);
 					spell.CanIReprioritize = 1;
@@ -2366,6 +2383,15 @@ void CreateHeal()
 			aaIndex = GetAAIndexByName(szTemp);
 			if (aaIndex > 0)
 			{
+				//renji: avoid double dipping from normal AA's, etc.
+				bool bFound = false;
+				for (int i = 0; szHeal[i]; i++)
+					if (!_stricmp(szTemp, szHeal[i]))
+					{
+						bFound = true;
+					}
+				if (!bFound) continue; //this spell is not in the heal list
+				//end
 				aa = pAltAdvManager->GetAAById(aaIndex);
 				if (aa && GetSpellByID(aa->SpellID))
 				{
@@ -2427,6 +2453,7 @@ void CreateHeal()
 				if (aa && GetSpellByID(aa->SpellID))
 				{
 					BotSpell spell;
+					spell.IniMatch = -1; //renji: temp workaround so doesn't match Spell0
 					spell.Spell = GetSpellByID(aa->SpellID);
 					strcpy_s(spell.SpellName, szTemp);
 					spell.ID = aa->ID;
@@ -2803,10 +2830,8 @@ void ListCommand(PSPAWNINFO pChar, PCHAR szLine)
 }
 void MemmedCommand(PSPAWNINFO pChar, PCHAR szLine)
 {
-	WriteChatf("MemmedCommand::No more crashing please!");
-	DebugSpewAlwaysFile("MemmedCommand::No more crashing please!");
 	CheckMemmedSpells();
-	//SortSpellVector(vMemmedSpells);
+	//SortSpellVector(vMemmedSpells); //we probably shouldn't sort this since they're in gem-order
 }
 #pragma endregion Commands
 
@@ -2862,7 +2887,10 @@ void LoadBotSpell(vector<_BotSpell> &v, char VectorName[MAX_STRING])
 		sprintf_s(szSpell, "Spell%dNamedOnly", v[i].IniMatch);
 		v[i].NamedOnly = GetPrivateProfileInt(INISection, szSpell, defNamedOnly, INIFileName);
 		sprintf_s(szSpell, "Spell%dPriority", v[i].IniMatch);
-		if (v[i].CanIReprioritize)
+		//renji:
+		//need to discuss how you want to handle this, but as it stands, spells found in the
+		//ini are not pulling the priority value because you set CanIReprioritize to 0
+		//if (v[i].CanIReprioritize)
 			v[i].Priority = GetPrivateProfileInt(INISection, szSpell, defPriority, INIFileName);
 		v[i].LastTargetID = 0;
 		v[i].LastCast = 0;
