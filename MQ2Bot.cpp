@@ -191,7 +191,7 @@ void CheckCall(int spell);
 void CheckCharm(int spell);
 void CheckClickies(int item);
 void CheckClickyBuffs(int item);
-void CheckClickyNukes(int item); 
+void CheckClickyNukes(int item);
 void CheckCure(int spell);
 void CheckDebuff(int spell);
 void CheckDisc(int spell);
@@ -250,12 +250,12 @@ bool		ValidBen(PSPELL pSpell, PSPAWNINFO Target);
 // function declare
 void(*spellFunc)(int);
 // bool declares
-bool	BardClass = false, DEBUG_DUMPFILE = false, ConfigureLoaded = false, InCombat = false, summoned = false, UseManualAssist = false, UseNetBots = false;
+bool	BardClass = false, ConfigureLoaded = false, InCombat = false, summoned = false, UseManualAssist = false, UseNetBots = false;
 
 // char declares
 char	AddList[MAX_STRING] = { 0 }, AssistName[MAX_STRING] = { 0 }, BodyTypeFix[MAX_STRING] = { 0 }, CurrentRoutine[MAX_STRING] = { 0 }, EQBCColor[MAX_STRING] = { 0 },
 INISection[MAX_STRING] = { 0 }, NetBotsName[MAX_STRING] = "NULL", spellCat[MAX_STRING] = { 0 }, spellType[MAX_STRING] = { 0 },
-conColor[MAX_STRING] = { 0 };
+conColor[MAX_STRING] = { 0 }, DEBUG_DUMPFILE[MAX_STRING]={0};
 
 // DWORD declares
 DWORD LastBodyID;
@@ -440,7 +440,7 @@ DWORD ChkCreateDir(char* pszDir)
 
 VOID DebugWrite(PCHAR szFormat, ...)
 {
-	if (!DEBUG_DUMPFILE)
+	if (_stricmp(DEBUG_DUMPFILE,"all") && _stricmp(DEBUG_DUMPFILE,CurrentRoutine))
 		return;
 	try
 	{
@@ -494,12 +494,12 @@ VOID DebugWrite(PCHAR szFormat, ...)
 	}
 	catch (exception &e)
 	{
-		DEBUG_DUMPFILE = false;
+		sprintf_s(DEBUG_DUMPFILE, NULL);
 		FatalError("[%s::%s] Severe Error: %s : %s", PLUGIN_NAME, __FUNCTION__, e.what(), typeid(e).name());
 	}
 	catch (...)
 	{
-		DEBUG_DUMPFILE = false;
+		sprintf_s(DEBUG_DUMPFILE, NULL);
 		FatalError("[%s::%s] Severe Error: Unknown", PLUGIN_NAME, __FUNCTION__);
 	}
 }
@@ -649,7 +649,7 @@ bool HasSpellAttrib(PSPELL pSpell, int attrib)
 
 PLUGIN_API DWORD OnWriteChatColor(PCHAR Line, DWORD Color, DWORD Filter)
 {
-	if (DEBUG_DUMPFILE)
+	if (_stricmp(DEBUG_DUMPFILE, "all") && _stricmp(DEBUG_DUMPFILE, CurrentRoutine))
 		DebugWrite(Line);
 	return 0;
 }
@@ -1428,7 +1428,7 @@ void CheckMemmedSpells()
 							vMemmedSpells[nGem].PreviousID = vMemmedSpells[nGem].ID;
 							strcpy_s(vMemmedSpells[nGem].SpellName, pSpell->Name);
 							vMemmedSpells[nGem].ID = pSpell->ID;
-							_itoa_s(nGem+1, szTemp, MAX_STRING, 10);
+							_itoa_s(nGem + 1, szTemp, MAX_STRING, 10);
 							strcpy_s(vMemmedSpells[nGem].Gem, szTemp);
 							SpellType(pSpell);
 							vMemmedSpells[nGem].CheckFunc = spellFunc; // temp code this needs replaced once i dont crash
@@ -2164,7 +2164,7 @@ void CreateAA()
 					bFound = true;
 				}
 			if (!bFound) continue; //this spell is not in the AA list
-			//end
+								   //end
 			aaIndex = GetAAIndexByName(szTemp);
 			if (aaIndex > 0)
 			{
@@ -2391,7 +2391,7 @@ void CreateHeal()
 						bFound = true;
 					}
 				if (!bFound) continue; //this spell is not in the heal list
-				//end
+									   //end
 				aa = pAltAdvManager->GetAAById(aaIndex);
 				if (aa && GetSpellByID(aa->SpellID))
 				{
@@ -2777,8 +2777,8 @@ void Configure(PCHAR szCustomIni, int force)
 			sprintf_s(INISection, "%s_%s", tempINI, szCustomIni);
 	}
 	char szTemp[MAX_STRING] = { 0 };
-	DEBUG_DUMPFILE = 0 != GetPrivateProfileInt(INISection, "Debugging", 0, INIFileName);//log to file?
-	WritePrivateProfileString(INISection, "Debugging", DEBUG_DUMPFILE ? "1" : "0", INIFileName);
+	GetPrivateProfileString(INISection, "Debugging", NULL, DEBUG_DUMPFILE, MAX_STRING, INIFileName);//log to file?
+	WritePrivateProfileString(INISection, "Debugging", DEBUG_DUMPFILE, INIFileName);
 	DefaultGem = GetPrivateProfileInt(INISection, "DefaultGem", 1, INIFileName); //default gem to cast with
 }
 #pragma endregion Configure
@@ -2891,7 +2891,7 @@ void LoadBotSpell(vector<_BotSpell> &v, char VectorName[MAX_STRING])
 		//need to discuss how you want to handle this, but as it stands, spells found in the
 		//ini are not pulling the priority value because you set CanIReprioritize to 0
 		//if (v[i].CanIReprioritize)
-			v[i].Priority = GetPrivateProfileInt(INISection, szSpell, defPriority, INIFileName);
+		v[i].Priority = GetPrivateProfileInt(INISection, szSpell, defPriority, INIFileName);
 		v[i].LastTargetID = 0;
 		v[i].LastCast = 0;
 		v[i].Recast = 0;
