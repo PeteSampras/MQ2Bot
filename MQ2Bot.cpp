@@ -75,55 +75,6 @@ PreSetup("MQ2Bot");
 #define	ISNUMBER() (IsNumber(Index))
 #define	GETNUMBER() (atoi(Index))
 #define	GETFIRST() Index
-#define CAST_SUCCESS      0
-#define CAST_INTERRUPTED  1
-#define CAST_RESIST       2
-#define CAST_COLLAPSE     3
-#define CAST_RECOVER      4
-#define CAST_FIZZLE       5
-#define CAST_STANDING     6
-#define CAST_STUNNED      7
-#define CAST_INVISIBLE    8
-#define CAST_NOTREADY     9
-#define CAST_OUTOFMANA   10
-#define CAST_OUTOFRANGE  11
-#define CAST_NOTARGET    12
-#define CAST_CANNOTSEE   13
-#define CAST_COMPONENTS  14
-#define CAST_OUTDOORS    15
-#define CAST_TAKEHOLD    16
-#define CAST_IMMUNE      17
-#define CAST_DISTRACTED  18
-#define CAST_ABORTED     19
-#define CAST_UNKNOWN     20
-#define CAST_IMMUNE_RUN  21
-#define CAST_IMMUNE_MEZ  22
-#define CAST_IMMUNE_SLOW 23
-
-#define FLAG_COMPLETE     0
-#define FLAG_REQUEST     -1
-#define FLAG_PROGRESS1   -2
-#define FLAG_PROGRESS2   -3
-#define FLAG_PROGRESS3   -4
-#define FLAG_PROGRESS4   -5
-
-#define DONE_COMPLETE    -3
-#define DONE_ABORTED     -2
-#define DONE_PROGRESS    -1
-#define DONE_SUCCESS      0
-
-#define RECAST_LAND       1
-
-#define DELAY_CAST    12000
-#define DELAY_MEMO     6000
-#define DELAY_STOP     3000
-
-#define CASTERANY 0
-#define CASTERME 1
-#define CASTEROTHER 2
-#define CASTEREVENT 3
-#define EVENTSLENGTH 75
-#define aCastEvent(List,Value,Filter) List.AddEvent(Filter,CastEvent,(void*)Value);
 #pragma endregion Headers
 
 #pragma region Prototypes
@@ -227,15 +178,48 @@ typedef struct _Spawns
 #pragma region FunctionDeclarations
 // declaration of create functions
 void CreateAA();
-void CreateClickies();
 void CreateDisc();
 void CreateHeal();
 
 // declaration of check routines
 void CheckAA(int spell);
 void CheckAggro(int spell);
+void CheckAura(int spell);
+void CheckBard(int spell);
+void CheckBuff(int spell);
+void CheckCall(int spell);
+void CheckCharm(int spell);
+void CheckClickies(int item);
+void CheckClickyBuffs(int item);
+void CheckClickyNukes(int item); 
+void CheckCure(int spell);
+void CheckDebuff(int spell);
 void CheckDisc(int spell);
+void CheckDot(int spell);
+void CheckEndurance(int spell);
+void CheckFade(int spell);
+void CheckFightBuff(int spell);
+void CheckGrab(int spell);
 void CheckHeal(int spell);
+void CheckHealPet(int spell);
+void CheckHealToT(int spell);
+void CheckImHit(int spell);
+void CheckItems(int item);
+void CheckJolt(int spell);
+void CheckKnockback(int spell);
+void CheckLifetap(int spell);
+void CheckMainTankBuff(int spell);
+void CheckMana(int spell);
+void CheckMez(int spell);
+void CheckNuke(int spell);
+void CheckNukeToT(int spell);
+void CheckPet(int spell);
+void CheckRez(int spell);
+void CheckRoot(int spell);
+void CheckSelfBuff(int spell);
+void CheckSnare(int spell);
+void CheckSummonItem(int spell);
+void CheckSwarm(int spell);
 
 // declaration of general functions
 int			CalcDuration(PSPELL pSpell);
@@ -263,6 +247,8 @@ bool		ValidBen(PSPELL pSpell, PSPAWNINFO Target);
 #pragma endregion FunctionDeclarations
 
 #pragma region VariableDefinitions
+// function declare
+void(*spellFunc)(int);
 // bool declares
 bool	BardClass = false, DEBUG_DUMPFILE = false, ConfigureLoaded = false, InCombat = false, summoned = false, UseManualAssist = false, UseNetBots = false;
 
@@ -1298,6 +1284,10 @@ BOOL AAReady(DWORD index)
 	return (result < 0);
 }
 
+void BotCastCommand(_BotSpell &spell) {
+	return;
+}
+
 BOOL DiscReady(char disc[MAX_STRING])
 {
 	for (unsigned long nCombatAbility = 0; nCombatAbility < NUM_COMBAT_ABILITIES; nCombatAbility++)
@@ -1441,9 +1431,10 @@ void CheckMemmedSpells()
 							_itoa_s(nGem+1, szTemp, MAX_STRING, 10);
 							strcpy_s(vMemmedSpells[nGem].Gem, szTemp);
 							SpellType(pSpell);
-							vMemmedSpells[nGem].CheckFunc = NULL; // temp code this needs replaced once i dont crash
+							vMemmedSpells[nGem].CheckFunc = spellFunc; // temp code this needs replaced once i dont crash
 							strcpy_s(vMemmedSpells[nGem].SpellCat, spellCat);
 							strcpy_s(vMemmedSpells[nGem].SpellType, spellType);
+							vMemmedSpells[nGem].Type = TYPE_SPELL;
 							vMemmedSpells[nGem].SpellTypeOption = spellTypeInt;
 							int defStartAt = 0, defUse = 0, defStopAt = 0, defPriority = 0, defNamedOnly = 0, defUseOnce = 0, defForceCast = 0;
 							for (int x = 0; DefaultSection[x]; x++)
@@ -1960,108 +1951,102 @@ void SpellType(PSPELL pSpell)
 	strcpy_s(spellType, "Unknown");
 	spellTypeInt = ZERO;
 	if ((GetSpellAttribX(pSpell, 0) == 192 && GetSpellBase(pSpell, 0) > 0) || (GetSpellAttribX(pSpell, 4) == 192 && GetSpellBase(pSpell, 4) > 0)) {
-		strcpy_s(spellType, "Aggro"); spellTypeInt = ::OPTIONS::AGGRO;  return;
+		strcpy_s(spellType, "Aggro"); spellTypeInt = ::OPTIONS::AGGRO; spellFunc = CheckAggro;  return;
 	}
 	if (pSpell->Category == 132 || pSpell->Subcategory == 132 || pSpell->Category == 71) {
-		strcpy_s(spellType, "Aura"); spellTypeInt = ::OPTIONS::AURA; return;
+		strcpy_s(spellType, "Aura"); spellTypeInt = ::OPTIONS::AURA; spellFunc = CheckAura;  return;
 	}
 	if (pSpell->Category == 13 || pSpell->Subcategory == 13) {
-		strcpy_s(spellType, "Charm"); spellTypeInt = ::OPTIONS::CHARM;  return;
+		strcpy_s(spellType, "Charm"); spellTypeInt = ::OPTIONS::CHARM;  spellFunc = CheckCharm;  return;
 	}
 	if (strstr(pSpell->Name, " Counterbias") || (pSpell->Subcategory == 21 && pSpell->TargetType == 0 || pSpell->Subcategory == 30 || pSpell->Subcategory == 88 || pSpell->Subcategory == 81) && pSpell->Category != 132) {
-		strcpy_s(spellType, "Debuff"); spellTypeInt = ::OPTIONS::DEBUFF; return;
+		strcpy_s(spellType, "Debuff"); spellTypeInt = ::OPTIONS::DEBUFF; spellFunc = CheckDebuff;  return;
 	}
 	if (strstr(pSpell->Name, "Dichotomic Paroxysm") || pSpell->Category == 126 && pSpell->Subcategory == 60 || pSpell->Category == 20 || pSpell->Category == 114 && pSpell->Subcategory == 33 || pSpell->Category == 114 && pSpell->Subcategory == 43 && GetSpellDuration(pSpell, (PSPAWNINFO)pLocalPlayer) > 0) {
-		strcpy_s(spellType, "Dot"); spellTypeInt = ::OPTIONS::DOT; return;
+		strcpy_s(spellType, "Dot"); spellTypeInt = ::OPTIONS::DOT; spellFunc = CheckDot;  return;
 	}
 	if (strstr(pSpell->Name, "Growl of the") || strstr(pSpell->Name, "Grim Aura") || strstr(pSpell->Name, "Roar of the Lion") || strstr(pSpell->Name, "Chaotic Benefaction") ||
 		strstr(pSpell->Name, "Dichotomic Companion") || strstr(pSpell->Name, "Dichotomic Fury") || HasSpellAttrib(pSpell, 323) && GetSpellDuration(pSpell, (PSPAWNINFO)pLocalPlayer) < 61 ||
 		pSpell->Category == 45 && pSpell->Subcategory == 141 && pSpell->TargetType == 6 || pSpell->Subcategory == 142 && pSpell->TargetType == 6 && pSpell->Category != 132 ||
 		pSpell->Category == 125 && pSpell->Subcategory == 16 && (pSpell->TargetType == 6 || pSpell->TargetType == 41) && GetSpellDuration(pSpell, (PSPAWNINFO)pLocalPlayer) < 61) {
-		strcpy_s(spellType, "FightBuff"); spellTypeInt = ::OPTIONS::FIGHTBUFF; return;
+		strcpy_s(spellType, "FightBuff"); spellTypeInt = ::OPTIONS::FIGHTBUFF; spellFunc = CheckFightBuff;  return;
 	}
 	if (pSpell->Category == 42 && (pSpell->Subcategory != 19 || strstr(pSpell->Name, "Balm") || strstr(pSpell->Name, "Splash of")) && pSpell->Subcategory != 82 && (pSpell->TargetType == 45 || pSpell->TargetType == 3 || pSpell->TargetType == 5 || pSpell->TargetType == 6 || pSpell->TargetType == 8 || pSpell->TargetType == 41)) {
-		strcpy_s(spellType, "Heal"); spellTypeInt = ::OPTIONS::HEAL; return;
+		strcpy_s(spellType, "Heal"); spellTypeInt = ::OPTIONS::HEAL; spellFunc = CheckHeal;  return;
 	}
 	//cure has to be after heal else fail
 	if (pSpell->Category == 42 && pSpell->Subcategory == 19) {
-		strcpy_s(spellType, "Cure"); spellTypeInt = ::OPTIONS::CURE; return;
+		strcpy_s(spellType, "Cure"); spellTypeInt = ::OPTIONS::CURE; spellFunc = CheckCure;  return;
 	}
 	if (pSpell->Subcategory == 42 && pSpell->Category == 69 || pSpell->Category == 42 && (pSpell->TargetType == 3 || pSpell->TargetType == 5 || pSpell->TargetType == 8)) {
-		strcpy_s(spellType, "HealPet"); spellTypeInt = ::OPTIONS::HEALPET; return;
+		strcpy_s(spellType, "HealPet"); spellTypeInt = ::OPTIONS::HEALPET; spellFunc = CheckHealPet;  return;
 	}
 	if (pSpell->TargetType == 46 && FindSpellInfoForAttrib(pSpell, BASE, 0) > 0) {
-		strcpy_s(spellType, "HealToT"); spellTypeInt = ::OPTIONS::HEALTOT; return;
+		strcpy_s(spellType, "HealToT"); spellTypeInt = ::OPTIONS::HEALTOT; spellFunc = CheckHealToT; return;
 	}
 	if (pSpell->Category == 5 && (GetSpellBaseX(pSpell, 0) < 0) || strstr(pSpell->Name, "freeze")) {
 		PSPELL pSpell2 = GetSpellByID(GetSpellBase2X(pSpell, 1));
 		if (pSpell2 && ((GetSpellAttribX(pSpell2, 2) == 192) || strstr(pSpell->Name, "Concussive ")) && GetCharInfo()->pSpawn->mActorClient.Class == Wizard) {
-			strcpy_s(spellType, "Jolt");
-			spellTypeInt = ::OPTIONS::JOLT;
-			return;
+			strcpy_s(spellType, "Jolt"); spellTypeInt = ::OPTIONS::JOLT; spellFunc = CheckJolt; return;
 		}
 	}
 	if (strstr(pSpell->Name, "Dichotomic Fang") || pSpell->Category == 114 && (pSpell->Subcategory == 43 || pSpell->Subcategory == 33)) {
-		strcpy_s(spellType, "Lifetap"); spellTypeInt = ::OPTIONS::LIFETAP; return;
+		strcpy_s(spellType, "Lifetap"); spellTypeInt = ::OPTIONS::LIFETAP; spellFunc = CheckLifetap;  return;
 	}
 	if (pSpell->Subcategory == 21 && GetSpellDuration(pSpell, (PSPAWNINFO)pLocalPlayer) < 51 || pSpell->Subcategory == 16 && pSpell->Category != 132 || pSpell->Subcategory == 62 || pSpell->Subcategory == 64 && strstr(pSpell->Name, " Retort") || pSpell->Category == 45 && pSpell->Subcategory == 141 || pSpell->Subcategory == 64 && strstr(pSpell->Name, "Divine I")) {
-		strcpy_s(spellType, "MainTankBuff"); spellTypeInt = ::OPTIONS::MAINTANKBUFF;  return;
+		strcpy_s(spellType, "MainTankBuff"); spellTypeInt = ::OPTIONS::MAINTANKBUFF;  spellFunc = CheckMainTankBuff;  return;
 	}
 	if (pSpell->Subcategory == 61 || pSpell->Subcategory == 17 && FindSpellInfoForAttrib(pSpell, BASE, 15) > 0 || strstr(pSpell->Name, " Symbiosis")) {
-		strcpy_s(spellType, "Mana"); spellTypeInt = ::OPTIONS::MANA; return;
+		strcpy_s(spellType, "Mana"); spellTypeInt = ::OPTIONS::MANA; spellFunc = CheckMana;  return;
 	}
 	if (pSpell->Subcategory == 35) {
-		strcpy_s(spellType, "Mez"); spellTypeInt = ::OPTIONS::MEZ; return;
+		strcpy_s(spellType, "Mez"); spellTypeInt = ::OPTIONS::MEZ; spellFunc = CheckMez;  return;
 	}
 	if (strstr(pSpell->Name, "Dichotomic Fusillade") || strstr(pSpell->Name, "Dichotomic Force") || strstr(pSpell->Name, "Dichotomic Fire") || pSpell->Category == 25 && pSpell->Subcategory != 35) {
-		strcpy_s(spellType, "Nuke");		spellTypeInt = NUKE; return;
+		strcpy_s(spellType, "Nuke");		spellTypeInt = NUKE; spellFunc = CheckNuke; return;
 	}
 	if (pSpell && pSpell->Autocast == 19780) {
 		if (pSpell->TargetType == 46 && FindSpellInfoForAttrib(pSpell, BASE, 0) > 0) {
-			strcpy_s(spellType, "NukeToT");
-			spellTypeInt = ::OPTIONS::NUKETOT;
-			return;
+			strcpy_s(spellType, "NukeToT"); spellTypeInt = ::OPTIONS::NUKETOT; spellFunc = CheckNukeToT; return;
 		}
 		else if (pSpell->TargetType == 5) {
 			for (int slot = 0; slot < GetSpellNumEffects(pSpell); ++slot) {
 				if (GetSpellAttrib(pSpell, slot) == 374) {
 					PSPELL pSpell2 = GetSpellByID(GetSpellBase2(pSpell, slot));
 					if (pSpell2 && GetSpellAttribX(pSpell2, 0) == 0 && GetSpellBase(pSpell2, 0) > 0 && pSpell2->TargetType == 46) {
-						strcpy_s(spellType, "NukeToT");
-						spellTypeInt = ::OPTIONS::NUKETOT;
-						return;
+						strcpy_s(spellType, "NukeToT"); spellTypeInt = ::OPTIONS::NUKETOT; spellFunc = CheckNukeToT; return;
 					}
 				}
 			}
 		}
 	}
 	if (pSpell->Category == 69 && pSpell->Subcategory > 97 && pSpell->Subcategory < 106 && pSpell->Subcategory != 101 && GetCharInfo()->pSpawn->mActorClient.Class != 12 && GetCharInfo()->pSpawn->mActorClient.Class != 2 && GetCharInfo()->pSpawn->mActorClient.Class != 6) {
-		strcpy_s(spellType, "Pet");		spellTypeInt = ::OPTIONS::PET; return;
+		strcpy_s(spellType, "Pet");		spellTypeInt = ::OPTIONS::PET; spellFunc = CheckPet;  return;
 	}
 	if (pSpell->Subcategory == 82) {
-		strcpy_s(spellType, "Rez");		spellTypeInt = ::OPTIONS::REZ; return;
+		strcpy_s(spellType, "Rez");		spellTypeInt = ::OPTIONS::REZ; spellFunc = CheckRez;  return;
 	}
 	if (pSpell->Subcategory == 83) {
-		strcpy_s(spellType, "Root");		spellTypeInt = ::OPTIONS::ROOT; return;
+		strcpy_s(spellType, "Root");		spellTypeInt = ::OPTIONS::ROOT; spellFunc = CheckRoot;  return;
 	}
 	// skipping SelfBuff for now
 	if (pSpell->Subcategory == 89) {
-		strcpy_s(spellType, "Snare");		spellTypeInt = ::OPTIONS::SNARE; return;
+		strcpy_s(spellType, "Snare");		spellTypeInt = ::OPTIONS::SNARE; spellFunc = CheckSnare;  return;
 	}
 	if (GetSpellAttribX(pSpell, 0) == 32) {
 		spellTypeInt = AGGRO;
-		strcpy_s(spellType, "SummonItem");	spellTypeInt = ::OPTIONS::SUMMONITEM; return;
+		strcpy_s(spellType, "SummonItem");	spellTypeInt = ::OPTIONS::SUMMONITEM; spellFunc = CheckSummonItem;  return;
 	}
 	if (pSpell->Subcategory == 104 && pSpell->Category == 69 && strstr(pSpell->Extra, "Rk") || pSpell->Subcategory == 99 && (GetCharInfo()->pSpawn->mActorClient.Class == 12 || GetCharInfo()->pSpawn->mActorClient.Class == 2) || pSpell->Subcategory == 139) {
-		strcpy_s(spellType, "Swarm");		spellTypeInt = ::OPTIONS::SWARM; return;
+		strcpy_s(spellType, "Swarm");		spellTypeInt = ::OPTIONS::SWARM; spellFunc = CheckSwarm;  return;
 	}
 	SpellCategory(pSpell);
 	if (spellCat != "Unknown") {
 		if (pSpell->TargetType == 6 || pSpell->TargetType == 41) {
-			strcpy_s(spellType, "SelfBuff"); spellTypeInt = ::OPTIONS::SELFBUFF;  return;
+			strcpy_s(spellType, "SelfBuff"); spellTypeInt = ::OPTIONS::SELFBUFF; spellFunc = CheckSelfBuff; return;
 		}
 		if (pSpell->TargetType != 6 && pSpell->TargetType != 41) {
-			strcpy_s(spellType, "Buff"); spellTypeInt = ::OPTIONS::BUFF;  return;
+			strcpy_s(spellType, "Buff"); spellTypeInt = ::OPTIONS::BUFF;  spellFunc = CheckBuff;  return;
 		}
 	}
 }
@@ -2374,7 +2359,7 @@ void CreateHeal()
 	int customSpells = GetPrivateProfileInt(INISection, "SpellTotal", 0, INIFileName);
 	for (int i = 0; i < customSpells; i++)
 	{
-		sprintf_s(szSpell, "SpellName%d", i);
+		sprintf_s(szSpell, "Spell%dName", i);
 		if (GetPrivateProfileString(INISection, szSpell, NULL, szTemp, MAX_STRING, INIFileName))
 		{
 			aaIndex = GetAAIndexByName(szTemp);
@@ -2505,6 +2490,68 @@ void CheckAA(int spell)
 }
 void CheckAggro(int spell)
 {
+	strcpy_s(CurrentRoutine, MAX_STRING, &(__FUNCTION__[5]));
+	DebugWrite("Checking %s: Spell: %s -- Priority: %d", CurrentRoutine, vMaster[spell].SpellName, vMaster[spell].Priority); // test code
+	return;
+}
+void CheckAura(int spell)
+{
+	strcpy_s(CurrentRoutine, MAX_STRING, &(__FUNCTION__[5]));
+	DebugWrite("Checking %s: Spell: %s -- Priority: %d", CurrentRoutine, vMaster[spell].SpellName, vMaster[spell].Priority); // test code
+	return;
+}
+void CheckBard(int spell)
+{
+	strcpy_s(CurrentRoutine, MAX_STRING, &(__FUNCTION__[5]));
+	DebugWrite("Checking %s: Spell: %s -- Priority: %d", CurrentRoutine, vMaster[spell].SpellName, vMaster[spell].Priority); // test code
+	return;
+}
+void CheckBuff(int spell)
+{
+	strcpy_s(CurrentRoutine, MAX_STRING, &(__FUNCTION__[5]));
+	DebugWrite("Checking %s: Spell: %s -- Priority: %d", CurrentRoutine, vMaster[spell].SpellName, vMaster[spell].Priority); // test code
+	return;
+}
+void CheckCall(int spell)
+{
+	strcpy_s(CurrentRoutine, MAX_STRING, &(__FUNCTION__[5]));
+	DebugWrite("Checking %s: Spell: %s -- Priority: %d", CurrentRoutine, vMaster[spell].SpellName, vMaster[spell].Priority); // test code
+	return;
+}
+void CheckCharm(int spell)
+{
+	strcpy_s(CurrentRoutine, MAX_STRING, &(__FUNCTION__[5]));
+	DebugWrite("Checking %s: Spell: %s -- Priority: %d", CurrentRoutine, vMaster[spell].SpellName, vMaster[spell].Priority); // test code
+	return;
+}
+void CheckClickies(int item)
+{
+	strcpy_s(CurrentRoutine, MAX_STRING, &(__FUNCTION__[5]));
+	//DebugWrite("Checking %s: Spell: %s -- Priority: %d", CurrentRoutine, vMaster[spell].SpellName, vMaster[spell].Priority); // test code
+	return;
+}
+void CheckClickyBuffs(int item)
+{
+	strcpy_s(CurrentRoutine, MAX_STRING, &(__FUNCTION__[5]));
+	//DebugWrite("Checking %s: Spell: %s -- Priority: %d", CurrentRoutine, vMaster[spell].SpellName, vMaster[spell].Priority); // test code
+	return;
+}
+void CheckClickyNukes(int item)
+{
+	strcpy_s(CurrentRoutine, MAX_STRING, &(__FUNCTION__[5]));
+	//DebugWrite("Checking %s: Spell: %s -- Priority: %d", CurrentRoutine, vMaster[spell].SpellName, vMaster[spell].Priority); // test code
+	return;
+}
+void CheckCure(int spell)
+{
+	strcpy_s(CurrentRoutine, MAX_STRING, &(__FUNCTION__[5]));
+	DebugWrite("Checking %s: Spell: %s -- Priority: %d", CurrentRoutine, vMaster[spell].SpellName, vMaster[spell].Priority); // test code
+	return;
+}
+void CheckDebuff(int spell)
+{
+	strcpy_s(CurrentRoutine, MAX_STRING, &(__FUNCTION__[5]));
+	DebugWrite("Checking %s: Spell: %s -- Priority: %d", CurrentRoutine, vMaster[spell].SpellName, vMaster[spell].Priority); // test code
 	return;
 }
 void CheckDisc(int spell)
@@ -2513,8 +2560,154 @@ void CheckDisc(int spell)
 	DebugWrite("Checking %s: Spell: %s -- Priority: %d", CurrentRoutine, vMaster[spell].SpellName, vMaster[spell].Priority); // test code
 	return;
 }
+void CheckDot(int spell)
+{
+	strcpy_s(CurrentRoutine, MAX_STRING, &(__FUNCTION__[5]));
+	DebugWrite("Checking %s: Spell: %s -- Priority: %d", CurrentRoutine, vMaster[spell].SpellName, vMaster[spell].Priority); // test code
+	return;
+}
+void CheckEndurance(int spell)
+{
+	strcpy_s(CurrentRoutine, MAX_STRING, &(__FUNCTION__[5]));
+	DebugWrite("Checking %s: Spell: %s -- Priority: %d", CurrentRoutine, vMaster[spell].SpellName, vMaster[spell].Priority); // test code
+	return;
+}
+void CheckFade(int spell)
+{
+	strcpy_s(CurrentRoutine, MAX_STRING, &(__FUNCTION__[5]));
+	DebugWrite("Checking %s: Spell: %s -- Priority: %d", CurrentRoutine, vMaster[spell].SpellName, vMaster[spell].Priority); // test code
+	return;
+}
+void CheckFightBuff(int spell)
+{
+	strcpy_s(CurrentRoutine, MAX_STRING, &(__FUNCTION__[5]));
+	DebugWrite("Checking %s: Spell: %s -- Priority: %d", CurrentRoutine, vMaster[spell].SpellName, vMaster[spell].Priority); // test code
+	return;
+}
+void CheckGrab(int spell)
+{
+	strcpy_s(CurrentRoutine, MAX_STRING, &(__FUNCTION__[5]));
+	DebugWrite("Checking %s: Spell: %s -- Priority: %d", CurrentRoutine, vMaster[spell].SpellName, vMaster[spell].Priority); // test code
+	return;
+}
 void CheckHeal(int spell)
 {
+	strcpy_s(CurrentRoutine, MAX_STRING, &(__FUNCTION__[5]));
+	DebugWrite("Checking %s: Spell: %s -- Priority: %d", CurrentRoutine, vMaster[spell].SpellName, vMaster[spell].Priority); // test code
+	return;
+}
+void CheckHealPet(int spell)
+{
+	strcpy_s(CurrentRoutine, MAX_STRING, &(__FUNCTION__[5]));
+	DebugWrite("Checking %s: Spell: %s -- Priority: %d", CurrentRoutine, vMaster[spell].SpellName, vMaster[spell].Priority); // test code
+	return;
+}
+void CheckHealToT(int spell)
+{
+	strcpy_s(CurrentRoutine, MAX_STRING, &(__FUNCTION__[5]));
+	DebugWrite("Checking %s: Spell: %s -- Priority: %d", CurrentRoutine, vMaster[spell].SpellName, vMaster[spell].Priority); // test code
+	return;
+}
+void CheckImHit(int spell)
+{
+	strcpy_s(CurrentRoutine, MAX_STRING, &(__FUNCTION__[5]));
+	DebugWrite("Checking %s: Spell: %s -- Priority: %d", CurrentRoutine, vMaster[spell].SpellName, vMaster[spell].Priority); // test code
+	return;
+}
+void CheckItems(int item)
+{
+	strcpy_s(CurrentRoutine, MAX_STRING, &(__FUNCTION__[5]));
+	//DebugWrite("Checking %s: Spell: %s -- Priority: %d", CurrentRoutine, vMaster[spell].SpellName, vMaster[spell].Priority); // test code
+	return;
+}
+void CheckJolt(int spell)
+{
+	strcpy_s(CurrentRoutine, MAX_STRING, &(__FUNCTION__[5]));
+	DebugWrite("Checking %s: Spell: %s -- Priority: %d", CurrentRoutine, vMaster[spell].SpellName, vMaster[spell].Priority); // test code
+	return;
+}
+void CheckKnockback(int spell)
+{
+	strcpy_s(CurrentRoutine, MAX_STRING, &(__FUNCTION__[5]));
+	DebugWrite("Checking %s: Spell: %s -- Priority: %d", CurrentRoutine, vMaster[spell].SpellName, vMaster[spell].Priority); // test code
+	return;
+}
+void CheckLifetap(int spell)
+{
+	strcpy_s(CurrentRoutine, MAX_STRING, &(__FUNCTION__[5]));
+	DebugWrite("Checking %s: Spell: %s -- Priority: %d", CurrentRoutine, vMaster[spell].SpellName, vMaster[spell].Priority); // test code
+	return;
+}
+void CheckMainTankBuff(int spell)
+{
+	strcpy_s(CurrentRoutine, MAX_STRING, &(__FUNCTION__[5]));
+	DebugWrite("Checking %s: Spell: %s -- Priority: %d", CurrentRoutine, vMaster[spell].SpellName, vMaster[spell].Priority); // test code
+	return;
+}
+void CheckMana(int spell)
+{
+	strcpy_s(CurrentRoutine, MAX_STRING, &(__FUNCTION__[5]));
+	DebugWrite("Checking %s: Spell: %s -- Priority: %d", CurrentRoutine, vMaster[spell].SpellName, vMaster[spell].Priority); // test code
+	return;
+}
+void CheckMez(int spell)
+{
+	strcpy_s(CurrentRoutine, MAX_STRING, &(__FUNCTION__[5]));
+	DebugWrite("Checking %s: Spell: %s -- Priority: %d", CurrentRoutine, vMaster[spell].SpellName, vMaster[spell].Priority); // test code
+	return;
+}
+void CheckNuke(int spell)
+{
+	strcpy_s(CurrentRoutine, MAX_STRING, &(__FUNCTION__[5]));
+	DebugWrite("Checking %s: Spell: %s -- Priority: %d", CurrentRoutine, vMaster[spell].SpellName, vMaster[spell].Priority); // test code
+	return;
+}
+void CheckNukeToT(int spell)
+{
+	strcpy_s(CurrentRoutine, MAX_STRING, &(__FUNCTION__[5]));
+	DebugWrite("Checking %s: Spell: %s -- Priority: %d", CurrentRoutine, vMaster[spell].SpellName, vMaster[spell].Priority); // test code
+	return;
+}
+void CheckPet(int spell)
+{
+	strcpy_s(CurrentRoutine, MAX_STRING, &(__FUNCTION__[5]));
+	DebugWrite("Checking %s: Spell: %s -- Priority: %d", CurrentRoutine, vMaster[spell].SpellName, vMaster[spell].Priority); // test code
+	return;
+}
+void CheckRez(int spell)
+{
+	strcpy_s(CurrentRoutine, MAX_STRING, &(__FUNCTION__[5]));
+	DebugWrite("Checking %s: Spell: %s -- Priority: %d", CurrentRoutine, vMaster[spell].SpellName, vMaster[spell].Priority); // test code
+	return;
+}
+void CheckRoot(int spell)
+{
+	strcpy_s(CurrentRoutine, MAX_STRING, &(__FUNCTION__[5]));
+	DebugWrite("Checking %s: Spell: %s -- Priority: %d", CurrentRoutine, vMaster[spell].SpellName, vMaster[spell].Priority); // test code
+	return;
+}
+void CheckSelfBuff(int spell)
+{
+	strcpy_s(CurrentRoutine, MAX_STRING, &(__FUNCTION__[5]));
+	DebugWrite("Checking %s: Spell: %s -- Priority: %d", CurrentRoutine, vMaster[spell].SpellName, vMaster[spell].Priority); // test code
+	return;
+}
+void CheckSnare(int spell)
+{
+	strcpy_s(CurrentRoutine, MAX_STRING, &(__FUNCTION__[5]));
+	DebugWrite("Checking %s: Spell: %s -- Priority: %d", CurrentRoutine, vMaster[spell].SpellName, vMaster[spell].Priority); // test code
+	return;
+}
+void CheckSummonItem(int spell)
+{
+	strcpy_s(CurrentRoutine, MAX_STRING, &(__FUNCTION__[5]));
+	DebugWrite("Checking %s: Spell: %s -- Priority: %d", CurrentRoutine, vMaster[spell].SpellName, vMaster[spell].Priority); // test code
+	return;
+}
+void CheckSwarm(int spell)
+{
+	strcpy_s(CurrentRoutine, MAX_STRING, &(__FUNCTION__[5]));
+	DebugWrite("Checking %s: Spell: %s -- Priority: %d", CurrentRoutine, vMaster[spell].SpellName, vMaster[spell].Priority); // test code
 	return;
 }
 #pragma endregion CheckRoutines
@@ -2643,37 +2836,38 @@ void LoadBotSpell(vector<_BotSpell> &v, char VectorName[MAX_STRING])
 			DiscCategory(v[i].Spell);
 		else
 			SpellType(v[i].Spell);
-		strcpy_s(v[i].SpellCat, spellType);
-		sprintf_s(szSpell, "SpellIf%d", v[i].IniMatch);
+		strcpy_s(v[i].SpellCat, spellCat);
+		strcpy_s(v[i].SpellType, spellType);
+		sprintf_s(szSpell, "Spell%dIf", v[i].IniMatch);
 		if (GetPrivateProfileString(INISection, szSpell, "1", szTemp, MAX_STRING, INIFileName))
 		{
 			strcpy_s(v[i].If, szTemp);
 		}
-		sprintf_s(szSpell, "SpellGem%d", v[i].IniMatch);
+		sprintf_s(szSpell, "Spell%dGem", v[i].IniMatch);
 		if (GetPrivateProfileString(INISection, szSpell, NULL, szTemp, MAX_STRING, INIFileName))
 		{
 			strcpy_s(v[i].Gem, szTemp);
 		}
-		sprintf_s(szSpell, "SpellUseOnce%d", v[i].IniMatch);
+		sprintf_s(szSpell, "Spell%dUseOnce", v[i].IniMatch);
 		v[i].UseOnce = GetPrivateProfileInt(INISection, szSpell, defUseOnce, INIFileName);
-		sprintf_s(szSpell, "SpellForceCast%d", v[i].IniMatch);
+		sprintf_s(szSpell, "Spell%dForceCast", v[i].IniMatch);
 		v[i].ForceCast = GetPrivateProfileInt(INISection, szSpell, defForceCast, INIFileName);
-		sprintf_s(szSpell, "SpellUse%d", v[i].IniMatch);
+		sprintf_s(szSpell, "Spell%dUse", v[i].IniMatch);
 		v[i].Use = GetPrivateProfileInt(INISection, szSpell, defUse, INIFileName);
-		sprintf_s(szSpell, "SpellStartAt%d", v[i].IniMatch);
+		sprintf_s(szSpell, "Spell%dStartAt", v[i].IniMatch);
 		v[i].StartAt = GetPrivateProfileInt(INISection, szSpell, defStartAt, INIFileName);
-		sprintf_s(szSpell, "SpellStopAt%d", v[i].IniMatch);
+		sprintf_s(szSpell, "Spell%dStopAt", v[i].IniMatch);
 		v[i].StopAt = GetPrivateProfileInt(INISection, szSpell, defStopAt, INIFileName);
-		sprintf_s(szSpell, "SpellNamedOnly%d", v[i].IniMatch);
+		sprintf_s(szSpell, "Spell%dNamedOnly", v[i].IniMatch);
 		v[i].NamedOnly = GetPrivateProfileInt(INISection, szSpell, defNamedOnly, INIFileName);
-		sprintf_s(szSpell, "SpellPriority%d", v[i].IniMatch);
+		sprintf_s(szSpell, "Spell%dPriority", v[i].IniMatch);
 		if (v[i].CanIReprioritize)
 			v[i].Priority = GetPrivateProfileInt(INISection, szSpell, defPriority, INIFileName);
 		v[i].LastTargetID = 0;
 		v[i].LastCast = 0;
 		v[i].Recast = 0;
 		v[i].TargetID = 0;
-		sprintf_s(szSpell, "SpellDuration%d", v[i].IniMatch);
+		sprintf_s(szSpell, "Spell%dDuration", v[i].IniMatch); // this isnt actually a thing yet
 		v[i].Duration = !GetSpellDuration2(v[i].Spell) ? 0 : 6000 * GetSpellDuration2(v[i].Spell) * (ULONGLONG)CalcDuration(v[i].Spell);
 		strcpy_s(v[i].Color, color);
 		DWORD n = 0;
@@ -2685,15 +2879,16 @@ void LoadBotSpell(vector<_BotSpell> &v, char VectorName[MAX_STRING])
 		}
 		if (v[i].Type == TYPE_AA)
 		{
+			// needs completed maybe
 			v[i].CastTime = v[i].Spell->CastTime;
 		}
 		if (v[i].Type == TYPE_ITEM)
 		{
-
+			// needs completed 
 		}
 		if (v[i].Type == TYPE_DISC)
 		{
-
+			// needs completed 
 		}
 	}
 	// PopulateIni(v, VectorName);
@@ -2754,739 +2949,6 @@ PLUGIN_API VOID OnRemoveSpawn(PSPAWNINFO pSpawn)
 }
 #pragma endregion Loading
 
-#pragma region UnusedCode
-
-
-#pragma endregion UnusedCode
-
-#pragma region MQ2CastCode
-#pragma region PrototypesNew
-
-
-SPELLFAVORITE SpellToMemorize;         // Favorite Spells Array
-long          SpellTotal;              // Favorite Spells Total
-
-
-
-bool          Parsed = false;            // BTree List Found Flags
-Blech         LIST013('#');            // BTree List for OnChat Message on Color  13
-Blech         LIST264('#');            // BTree List for OnChat Message on Color 264
-Blech         LIST289('#');            // BTree List for OnChat Message on Color 289
-Blech         UNKNOWN('#');            // BTree List for OnChat Message on UNKNOWN Yet Color
-Blech         SUCCESS('#');            // BTree List for OnChat Message on SUCCESS Detection
-
-#pragma endregion PrototypesNew
-bool          Immobile = false;        // Immobile?
-bool          Invisible = false;        // Invisibility Check?
-
-bool          Casting = false;        // Casting Window was opened?
-long          Resultat = CAST_SUCCESS; // Resultat
-ULONGLONG     ImmobileT = 0;            // Estimate when it be immobilized!
-long          CastingD = NOID;           // Casting Spell Detected
-long          CastingC = NOID;           // Casting Current ID
-long          CastingE = CAST_SUCCESS;   // Casting Current Result
-long          CastingL = NOID;           // Casting LastOne ID
-long          CastingX = CAST_SUCCESS;   // Casting LastOne Result
-ULONGLONG     CastingT = 0;              // Casting Timeout
-long          CastingO = NOID;           // Casting OnTarget
-ULONGLONG     CastingP = 0;              // Casting Pulse
-
-long          TargI = 0;                 // Target ID
-long          TargC = 0;                 // Target Current
-
-long          StopF = FLAG_COMPLETE;     // Stop Event Flag Progress?
-long          StopE = DONE_SUCCESS;      // Stop Event Exit Value
-ULONGLONG     StopM = 0;                 // Stop Event Mark
-
-long          MoveA = FLAG_COMPLETE;     // Move Event AdvPath?
-long          MoveS = FLAG_COMPLETE;     // Move Event Stick?
-long          MoveF = FLAG_COMPLETE;     // Move Event MQ2AdvPath Following?
-long          MoveP = FLAG_COMPLETE;     // Move Event MQ2AdvPath Pathing?
-
-long          MemoF = FLAG_COMPLETE;     // Memo Event Flag
-long          MemoE = DONE_SUCCESS;      // Memo Event Exit
-ULONGLONG     MemoM = 0;                 // Memo Event Mark
-
-long          DuckF = FLAG_COMPLETE;     // Duck Flag
-ULONGLONG     DuckM = 0;                 // Duck Time Stamp
-
-long          CastF = FLAG_COMPLETE;     // Cast Flag
-long          CastE = CAST_SUCCESS;      // Cast Exit Return value
-long          CastG = NOID;              // Cast Gem ID
-void         *CastI = NULL;              // Cast ID   [spell/alt/item]
-long          CastK = NOID;              // Cast Kind [spell/alt/item]
-long          CastT = 0;                 // Cast Time [spell/alt/item]
-ULONGLONG     CastM = 0;                 // Cast TimeMark Start Casting
-long          CastR = 3;                 // Cast Retry Counter
-long          CastW = RECAST_LAND;                 // Cast Retry Type
-char          CastC[MAX_STRING];       // Cast SpellType
-char          CastN[MAX_STRING];       // Cast SpellName
-
-
-PSPELL        CastS = NULL;              // Cast Spell Pointer
-										 // Timer Structure
-struct TimerSingle {
-	long TimerID;
-	PSPELL pSpell;
-	long EventID;
-	int CastE;
-	long SpawnID;
-	time_t timestamp;
-	int Caster;
-	bool AutoRecast;
-	char SpawnName[64];
-	time_t TimeOut;
-} pTimerList;
-
-// Spell Event Structure
-struct SpellEvent {
-	PSPELL pHSpell;								// Higest spell ID
-	vector<PSPELL> pSpells;						// All Matching spell ID'S
-	char Event[EVENTSLENGTH];
-} pSpellEventList;
-
-struct EventTimer {
-	char Name[MAX_STRING];
-	//	int IsSpell;
-	char Event[MAX_STRING];
-	int Duration;
-	int SpawnType;
-} pEventList;
-list<TimerSingle>    TimerList;          // timer list
-vector<SpellEvent>  SpellEventList;
-vector<EventTimer>  EventList;
-vector<unsigned long>  BleachList;
-time_t lastRun = 0;
-long lastTargetID = 0;							// ID of curent Last Target
-long currentTargetID = 0;						// ID of curent Target
-long TimerCount = 0;							// Timer ID Count
-ULONGLONG UITimer = 0;
-VOID ClearOne(list<TimerSingle>::iterator &CurList);
-VOID DefaultTimer(TimerSingle &MyData);
-VOID SetTimerData(TimerSingle &MyData, list<TimerSingle>::iterator &CurList);
-long getSpellTimer(long SpawnID, int Caster, vector<PSPELL> SpellSearch);
-eSpawnType SpawnType(PSPAWNINFO tSpawn);
-VOID RestackTimer(list<TimerSingle>::iterator &CurList, TimerSingle MyData, int Remove);
-
-
-
-VOID ClearOne(list<TimerSingle>::iterator &CurList)
-{
-	return;
-}
-VOID DefaultTimer(TimerSingle &MyData)
-{
-	return;
-}
-VOID SetTimerData(TimerSingle &MyData, list<TimerSingle>::iterator &CurList)
-{
-	return;
-}
-VOID RestackTimer(list<TimerSingle>::iterator &CurList, TimerSingle MyData, int Remove)
-{
-	return;
-}
-
-
-void __stdcall CastEvent(unsigned int ID, void *pData, PBLECHVALUE pValues) {
-	Parsed = true;
-	if (CastingE < (long)pData) CastingE = (long)pData;
-	DebugWrite("[%llu] MQ2Bot:[OnChat]: Result=[%s (%d)] Called=[%d].", MQGetTickCount64(), cast_status[CastingE], CastingE, (long)pData);
-}
-
-void Stick(PCHAR zFormat, ...) {
-	typedef VOID(__cdecl *StickCALL) (PSPAWNINFO, PCHAR);
-	char zOutput[MAX_STRING]; va_list vaList; va_start(vaList, zFormat);
-	vsprintf_s(zOutput, zFormat, vaList);
-	PMQPLUGIN pLook = pPlugins;
-	while (pLook && _strnicmp(pLook->szFilename, "MQ2MoveUtils", 12)) pLook = pLook->pNext;
-	if (pLook && pLook->fpVersion > 0.9999 && pLook->RemoveSpawn)
-		if (StickCALL Request = (StickCALL)GetProcAddress(pLook->hModule, "StickCommand"))
-			Request(GetCharInfo()->pSpawn, zOutput);
-}
-
-void FollowPath(PCHAR zFormat, ...) {
-	typedef VOID(__cdecl *FollowCALL) (PSPAWNINFO, PCHAR);
-	char zOutput[MAX_STRING]; va_list vaList; va_start(vaList, zFormat);
-	vsprintf_s(zOutput, zFormat, vaList);
-	PMQPLUGIN pLook = pPlugins;
-	while (pLook && _strnicmp(pLook->szFilename, "MQ2AdvPath", 10)) pLook = pLook->pNext;
-	if (pLook && pLook->fpVersion > 0.999 && pLook->RemoveSpawn)
-		if (FollowCALL Request = (FollowCALL)GetProcAddress(pLook->hModule, "MQFollowCommand"))
-			Request(GetCharInfo()->pSpawn, zOutput);
-}
-void Path(PCHAR zFormat, ...) {
-	typedef VOID(__cdecl *FollowCALL) (PSPAWNINFO, PCHAR);
-	char zOutput[MAX_STRING]; va_list vaList; va_start(vaList, zFormat);
-	vsprintf_s(zOutput, zFormat, vaList);
-	PMQPLUGIN pLook = pPlugins;
-	while (pLook && _strnicmp(pLook->szFilename, "MQ2AdvPath", 10)) pLook = pLook->pNext;
-	if (pLook && pLook->fpVersion > 0.999 && pLook->RemoveSpawn)
-		if (FollowCALL Request = (FollowCALL)GetProcAddress(pLook->hModule, "MQPlayCommand"))
-			Request(GetCharInfo()->pSpawn, zOutput);
-}
-
-
-long Evaluate(PCHAR zFormat, ...) {
-	char zOutput[MAX_STRING] = { 0 }; va_list vaList; va_start(vaList, zFormat);
-	vsprintf_s(zOutput, zFormat, vaList); if (!zOutput[0]) return 1;
-	ParseMacroData(zOutput, MAX_STRING); return atoi(zOutput);
-}
-
-void MemoLoad(long Gem, PSPELL Spell)
-{
-	if (!Spell) {
-		DebugSpewAlways("%s::MemoLoad(%ld, 0x%08X) - PSPELL Spell == NULL", PLUGIN_NAME, Gem, Spell);
-		return;
-	}
-	PCHARINFO pChar = GetCharInfo();
-	if (!pChar) {
-		DebugSpewAlways("%s::MemoLoad(%ld, 0x%08X) - PCHARINFO pChar == NULL", PLUGIN_NAME, Gem, Spell);
-		return;
-	}
-	if (!pChar->pSpawn) {
-		DebugSpewAlways("%s::MemoLoad(%ld, 0x%08X) - pChar->pSpawn == NULL", PLUGIN_NAME, Gem, Spell);
-		return;
-	}
-	if ((pChar->pSpawn->mActorClient.Class) < 0 || pChar->pSpawn->mActorClient.Class > 17) {
-		DebugSpewAlways("%s::MemoLoad(%ld, 0x%08X) - pChar->pSpawn->mActorClient.Class out of range: %d", PLUGIN_NAME, Gem, Spell, pChar->pSpawn->mActorClient.Class);
-		return;
-	}
-	if (Spell->ClassLevel[pChar->pSpawn->mActorClient.Class] > pChar->pSpawn->Level) {
-		DebugSpewAlways("%s::MemoLoad(%ld, 0x%08X) - Spell->ClassLevel[pChar->pSpawn->mActorClient.Class] > pChar->pSpawn->Level (%d > %d)", PLUGIN_NAME, Gem, Spell, Spell->ClassLevel[pChar->pSpawn->mActorClient.Class], pChar->pSpawn->Level);
-		return;
-	}
-	for (int sp = 0; sp < NUM_SPELL_GEMS; sp++)
-		if (SpellToMemorize.SpellId[sp] == Spell->ID)
-			SpellToMemorize.SpellId[sp] = 0xFFFFFFFF;
-	SpellToMemorize.SpellId[((DWORD)Gem < NUM_SPELL_GEMS) ? Gem : 4] = Spell->ID;
-}
-
-void Reset() {
-	TargI = 0;                 // Target ID
-	TargC = 0;                 // Target Check ID
-	StopF = FLAG_COMPLETE;     // Stop Event Flag Progress?
-	StopE = DONE_SUCCESS;      // Stop Event Exit Value
-	MoveA = FLAG_COMPLETE;     // Stop Event AdvPath?
-	MoveS = FLAG_COMPLETE;     // Stop Event Stick?
-	MoveF = FLAG_COMPLETE;     // Stop Event MQ2AdvPath Following?
-	MoveP = FLAG_COMPLETE;     // Stop Event MQ2AdvPath Pathing?
-	MemoF = FLAG_COMPLETE;     // Memo Event Flag
-	MemoE = DONE_SUCCESS;      // Memo Event Exit
-	DuckF = FLAG_COMPLETE;     // Duck Flag
-	CastF = FLAG_COMPLETE;     // Cast Flag
-	CastE = CAST_SUCCESS;      // Cast Exit Return value
-	CastG = NOID;              // Cast Gem ID
-	CastI = NULL;              // Cast ID   [spell/alt/item/disc]
-	CastK = NOID;              // Cast Kind [spell/alt/item/disc] [-1=unknown]
-	CastT = 0;                 // Cast Time [spell/alt/item/disc]
-	CastC[0] = 0;              // Cast SpellType
-	CastN[0] = 0;              // Cast SpellName
-	CastR = 1;                 // Cast Retry Counter
-	CastW = RECAST_LAND;       // Cast Retry Type
-	Invisible = false;         // Invisibility Check?
-	ZeroMemory(&SpellToMemorize, sizeof(SPELLFAVORITE));
-	strcpy_s(SpellToMemorize.Name, "Mem a Spell");
-	SpellToMemorize.inuse = 1;
-	for (int sp = 0; sp < NUM_SPELL_GEMS; sp++) SpellToMemorize.SpellId[sp] = 0xFFFFFFFF;
-	SpellTotal = 0;
-}
-
-VOID AddSpellTimer(int SpawnID, PSPELL pSpell, int TickE, bool ignoreMod)
-{
-	if (!SpawnID || SpawnID == NOID || !pSpell->ID || !gbInZone || !GetCharInfo() || !GetCharInfo()->pSpawn) return;
-	time_t now = time(NULL);
-	list<TimerSingle>::iterator CurList = TimerList.begin();
-	list<TimerSingle>::iterator EndList = TimerList.end();
-	switch (TickE) {
-	case CAST_SUCCESS: // CAST_SUCCESS
-		now = now + CalcDuration(pSpell);
-		break;
-	case CAST_IMMUNE: // CAST_IMMUNE
-		now = now + 100000;
-		break;
-	case CAST_IMMUNE_RUN: // CAST_IMMUNE
-		now = now + 100000;
-		break;
-	case CAST_IMMUNE_MEZ: // CAST_IMMUNE
-		now = now + 100000;
-		break;
-	case CAST_IMMUNE_SLOW: // CAST_IMMUNE
-		now = now + 100000;
-		break;
-	case CAST_TAKEHOLD: // CAST_TAKEHOLD
-		now = now + CalcDuration(pSpell);
-		break;
-	default: // Unknown
-		return;
-	}
-	bool AutoRecast = false;
-
-	bool Remove = false;
-	while (CurList != EndList) {
-		if (CurList->SpawnID && CurList->SpawnID == SpawnID && CurList->pSpell && CurList->pSpell->ID == pSpell->ID) {
-			if ((ignoreMod && CurList->Caster == CASTEROTHER) || !ignoreMod) {
-				if ((now - CurList->timestamp) <= 1) TickE = CurList->CastE;
-				AutoRecast = CurList->AutoRecast;
-			}
-			Remove = true;
-			break;
-		}
-		else CurList++;
-	}
-
-	TimerSingle MyData;
-	DefaultTimer(MyData);
-	TimerCount++;
-	MyData.TimerID = TimerCount;
-	MyData.pSpell = pSpell;
-	MyData.CastE = TickE;
-	MyData.SpawnID = SpawnID;
-	MyData.AutoRecast = AutoRecast;
-	MyData.timestamp = now;
-	if (ignoreMod) MyData.Caster = CASTEROTHER;
-
-	RestackTimer(CurList, MyData, Remove);
-}
-/*
-//	Add spell self casted spells spell list including instant cast
-//	only usede from /casting
-*/
-VOID AddSpell(int TargetID, int SpellID, int TickE)
-{
-
-	if (PSPELL pSpell = (PSPELL)GetSpellByID(SpellID)) {
-		if (!GetSpellDuration(pSpell, (PSPAWNINFO)pLocalPlayer)) return;
-		switch (pSpell->TargetType) {
-		case  3: // Group v1
-		case  6: // Self
-		case 41: // Group v2
-			AddSpellTimer(GetCharInfo()->pSpawn->SpawnID, pSpell, TickE, false);
-			break;
-		case 14: // Pet
-			AddSpellTimer(GetCharInfo()->pSpawn->PetID, pSpell, TickE, false);
-			break;
-		case  5: // Single
-		case  8: // Targeted AE
-			AddSpellTimer(TargetID, pSpell, TickE, false);
-			break;
-		default: break; // Unknown
-		}
-	}
-}
-/*
-//	Handle Spell Casting done by yourself and call AddSpell() to
-//	add a spell and call CastTimerWnd->UpdateList() to update the Target window
-*/
-void CastTimer(int TargetID, int SpellID, long TickE)
-{
-	if (SpellID && TickE == CAST_RECOVER) TickE = CAST_SUCCESS;
-	if (SpellID && TickE == CAST_OUTDOORS) TickE = CAST_IMMUNE;
-	if (TickE != CAST_SUCCESS && TickE != CAST_IMMUNE && TickE != CAST_TAKEHOLD) return;
-	AddSpell(TargetID, SpellID, TickE);
-}
-
-void Success(PSPELL Cast) {
-	SUCCESS.Reset();
-	// WriteChatf("Success(Cast) = %d",Cast);
-	if (Cast) {
-		char Temps[MAX_STRING];
-		bool Added = false;
-		/*
-		if (Cast->CastOnYou[0]) {
-		sprintf_s(Temps, "%s#*#", Cast->CastOnYou);
-		aCastEvent(SUCCESS, CAST_SUCCESS, Temps);
-		Added = true;
-		}
-		if (Cast->CastOnAnother[0]) {
-		sprintf_s(Temps, "#*#%s#*#", Cast->CastOnAnother);
-		aCastEvent(SUCCESS, CAST_SUCCESS, Temps);
-		Added = true;
-		}
-		*/
-		//20181224:renji
-		//Updated to change PSPELL->CastOnYou to use GetSpellString per Feb 21 2018 patch
-		/*CastByMe,CastByOther,CastOnYou,CastOnAnother,WearOff*/
-		//CastOnYou
-		if (char*str = GetSpellString(Cast->ID, 2)) {
-			sprintf_s(Temps, "%s#*#", str);
-			aCastEvent(SUCCESS, CAST_SUCCESS, Temps);
-			Added = true;
-		}
-		//CastOnAnother
-		if (char*str = GetSpellString(Cast->ID, 3)) {
-			sprintf_s(Temps, "%s#*#", str);
-			aCastEvent(SUCCESS, CAST_SUCCESS, Temps);
-			Added = true;
-		}
-		if (!Added)
-			aCastEvent(SUCCESS, CAST_SUCCESS, "You begin casting#*#");
-	}
-}
-
-float Speed() {
-	float MySpeed = 0.0f;
-	if (PSPAWNINFO Self = GetCharInfo()->pSpawn) {
-		MySpeed = Self->SpeedRun;
-		if (PSPAWNINFO Mount = FindMount(Self))
-			MySpeed = Mount->SpeedRun;
-	}
-	if (BardClass)
-		MySpeed = 0.0f;
-	return MySpeed;
-}
-
-bool Moving() {
-	ULONGLONG MyTimer = MQGetTickCount64();
-	if (Speed() != 0.0f) ImmobileT = MyTimer + (ULONGLONG)500;
-	return (!MQ2Globals::gbMoving && (!ImmobileT || MyTimer > ImmobileT));
-}
-
-void StopEnding() {
-	char flag[MAX_STRING] = { 0 };
-	if (MoveS != FLAG_COMPLETE) {
-		DebugWrite("[%llu] MQ2Bot:[Immobilize]: Stick UnPause Request.", MQGetTickCount64());
-		Stick("unpause");
-		MoveS = FLAG_COMPLETE;
-	}
-	if (MoveA != FLAG_COMPLETE) {
-		DebugWrite("[%llu] MQ2Bot:[Immobilize]: AdvPath UnPause Request.", MQGetTickCount64());
-		sprintf_s(flag, "/varcalc PauseFlag 0");
-		HideDoCommand(GetCharInfo()->pSpawn, flag, FromPlugin);
-		MoveA = FLAG_COMPLETE;
-	}
-	if (MoveF != FLAG_COMPLETE) {
-		DebugWrite("[%llu] MQ2Bot:[Immobilize]: MQ2AdvPath UnPause Request.", MQGetTickCount64());
-		FollowPath("unpause");
-		MoveF = FLAG_COMPLETE;
-	}
-	if (MoveP != FLAG_COMPLETE) {
-		DebugWrite("[%llu] MQ2Bot:[Immobilize]: MQ2AdvPath UnPause Request.", MQGetTickCount64());
-		Path("unpause");
-		MoveP = FLAG_COMPLETE;
-	}
-}
-
-void StopHandle() {
-	char flag[MAX_STRING] = { 0 };
-	if (StopF == FLAG_REQUEST) {
-		DebugWrite("[%llu] MQ2Bot:[Immobilize]: Request.", MQGetTickCount64());
-		StopM = MQGetTickCount64() + (ULONGLONG)DELAY_STOP;
-		StopF = FLAG_PROGRESS1;
-		StopE = DONE_PROGRESS;
-	}
-	if (Evaluate("${If[${Stick.Status.Equal[ON]},1,0]}")) {
-		DebugWrite("[%llu] MQ2Bot:[Immobilize]: Stick Pause Request.", MQGetTickCount64());
-		Stick("pause");
-		MoveS = FLAG_PROGRESS1;
-	}
-	if (Evaluate("${If[${Bool[${FollowFlag}]},1,0]}")) {
-		DebugWrite("[%llu] MQ2Bot:[Immobilize]: AdvPath Pause Request.", MQGetTickCount64());
-		sprintf_s(flag, "/varcalc PauseFlag 1");
-		HideDoCommand(GetCharInfo()->pSpawn, flag, FromPlugin);
-		MoveA = FLAG_PROGRESS1;
-	}
-	if (Evaluate("${If[${AdvPath.Following} && !${AdvPath.Paused},1,0]}")) {
-		DebugWrite("[%llu] MQ2Bot:[Immobilize]: MQ2AdvPath Pause Request.", MQGetTickCount64());
-		FollowPath("pause");
-		MoveF = FLAG_PROGRESS1;
-	}
-	if (Evaluate("${If[${AdvPath.Playing} && !${AdvPath.Paused},1,0]}")) {
-		DebugWrite("[%llu] MQ2Bot:[Immobilize]: MQ2AdvPath Pause Request.", MQGetTickCount64());
-		Path("pause");
-		MoveP = FLAG_PROGRESS1;
-	}
-	if (Immobile = Moving()) {
-		DebugWrite("[%llu] MQ2Bot:[Immobilize]: Complete.", MQGetTickCount64());
-		StopF = FLAG_COMPLETE;
-		StopE = DONE_SUCCESS;
-	}
-	if (MQGetTickCount64() > StopM) {
-		WriteChatf("[%llu] MQ2Bot:[Immobilize]: Aborting!", MQGetTickCount64());
-		StopF = FLAG_COMPLETE;
-		StopE = DONE_ABORTED;
-		return;
-	}
-	if (StopF == FLAG_PROGRESS1) {
-		StopF = FLAG_PROGRESS2;
-		if (Speed() != 0.0f) {
-			MQ2Globals::ExecuteCmd(FindMappableCommand("back"), 1, 0);
-			MQ2Globals::ExecuteCmd(FindMappableCommand("back"), 0, 0);
-		}
-	}
-}
-
-bool GEMReady(DWORD ID) {
-	if (pCastSpellWnd && ID < NUM_SPELL_GEMS)
-		if ((long)((PEQCASTSPELLWINDOW)pCastSpellWnd)->SpellSlots[ID]->spellicon != NOID)
-			if ((long)((PEQCASTSPELLWINDOW)pCastSpellWnd)->SpellSlots[ID]->spellstate != 1)
-				return true;
-	return false;
-}
-void MemoHandle() {
-	static int SP = 0;
-	if (!pSpellBookWnd)
-		MemoE = DONE_ABORTED;
-	else {
-		bool Complete = true;
-		for (int sp = 0; sp < NUM_SPELL_GEMS; sp++)
-			if (SpellToMemorize.SpellId[sp] != 0xFFFFFFFF && SpellToMemorize.SpellId[sp] != GetCharInfo2()->MemorizedSpells[sp]) {
-				SP = sp;
-				Complete = false;
-				break;
-			}
-		if (!Complete) {
-			if (MemoF == FLAG_REQUEST) {
-				DebugWrite("[%llu] MQ2Bot:[Memorize]: Immobilize.", MQGetTickCount64());
-				MemoF = FLAG_PROGRESS1;
-				MemoE = DONE_PROGRESS;
-				//if (GetCharInfo()->pSpawn->Level<4 && DELAY_MEMO<17000UL)
-				//	DELAY_MEMO = 17000UL;
-				MemoM = MQGetTickCount64() + DELAY_STOP + DELAY_MEMO * SpellTotal;
-				if (StopF == FLAG_COMPLETE)
-					StopE = DONE_SUCCESS;
-				if (StopF == FLAG_COMPLETE)
-					StopF = FLAG_REQUEST;
-				if (StopF != FLAG_COMPLETE)
-					StopHandle();
-			}
-			if (MemoF == FLAG_PROGRESS1 && StopE == DONE_SUCCESS) {
-				DebugWrite("[%llu] MQ2Bot:[Memorize]: Spell(s).", MQGetTickCount64());
-				MemoF = FLAG_PROGRESS2;
-				DWORD Favorite = (DWORD)&SpellToMemorize;
-				pSpellBookWnd->MemorizeSet((int*)Favorite, NUM_SPELL_GEMS);
-			}
-			if (StopE == DONE_ABORTED || MQGetTickCount64() > MemoM)
-				MemoE = DONE_ABORTED;
-		}
-		else {
-			if (GEMReady(SP) || MQGetTickCount64() > MemoM) {
-				DebugWrite("[%llu] MQ2Bot:[Memorize]: Complete.", MQGetTickCount64());
-				MemoF = FLAG_COMPLETE;
-				MemoE = DONE_SUCCESS;
-			}
-		}
-	}
-	if (MemoE == DONE_ABORTED || !pSpellBookWnd) {
-		WriteChatf("[%llu] MQ2Bot:[Memorize]: Aborting!", MQGetTickCount64());
-		MemoF = FLAG_COMPLETE;
-	}
-	if (MemoF == FLAG_COMPLETE && (pSpellBookWnd && (PCSIDLWND)pSpellBookWnd->dShow)) {
-		DebugWrite("[%llu] MQ2Bot:[Memorize]: Closebook.", MQGetTickCount64());
-		EzCommand("/book");
-	}
-}
-
-void DuckHandle() {
-	if (DuckF == FLAG_REQUEST) {
-		DebugWrite("[%llu] MQ2Bot:[Duck]: Request.", MQGetTickCount64());
-		DuckF = FLAG_PROGRESS1;
-		DuckM = 0;
-	}
-	if (DuckF == FLAG_PROGRESS1) {
-		if (GetCharInfo()->pSpawn->Mount) {
-			if (!DuckM) {
-				DebugWrite("[%llu] MQ2Bot:[Duck]: Dismount.", MQGetTickCount64());
-				DuckM = MQGetTickCount64();
-				EzCommand("/dismount");
-			}
-		}
-		else DuckF = FLAG_PROGRESS2;
-	}
-	if (DuckF == FLAG_PROGRESS2) {
-		DebugWrite("[%llu] MQ2Bot:[Duck]: StopCast.", MQGetTickCount64());
-		EzCommand("/stopcast");
-		CastingE = CAST_ABORTED;
-		DuckF = FLAG_COMPLETE;
-	}
-}
-
-void CastHandle(_BotSpell &spell) {
-	char flag[MAX_STRING] = { 0 };
-	// we got the casting request cookies, request immobilize/memorize if needed.
-	if (CastF == FLAG_REQUEST) {
-		DebugWrite("[%llu] MQ2Bot:[Casting]: Request.", MQGetTickCount64());
-		CastF = FLAG_PROGRESS1;
-		if (StopF == FLAG_COMPLETE) StopF = DONE_SUCCESS;
-		if (StopF == FLAG_COMPLETE && CastT > 100 && !BardClass) StopF = FLAG_REQUEST;
-		if (MemoF != FLAG_COMPLETE) MemoHandle();
-		else if (StopF != FLAG_COMPLETE) StopHandle();
-	}
-
-	// waiting on the casting results to take actions.
-	if (CastF == FLAG_PROGRESS3 && CastingE != DONE_PROGRESS) {
-		CastF = FLAG_PROGRESS4;
-		if (CastR) CastR--;
-		if (CastR) {
-			if ((CastingE == CAST_SUCCESS && CastW != RECAST_LAND) ||
-				(CastingE == CAST_COLLAPSE) ||
-				(CastingE == CAST_FIZZLE) ||
-				(CastingE == CAST_INTERRUPTED) ||
-				(CastingE == CAST_RECOVER) ||
-				(CastingE == CAST_RESIST)) {
-				DebugWrite("[%llu] MQ2Bot:[Casting]: AutoRecast [%d].", MQGetTickCount64(), CastingE);
-				if (!TargC) TargC = (pTarget) ? ((PSPAWNINFO)pTarget)->SpawnID : 0;
-				CastM = MQGetTickCount64() + DELAY_CAST;
-				CastF = FLAG_REQUEST;
-			}
-		}
-	}
-
-	// casting is over, grab latest casting results and exit.
-	if (CastF == FLAG_PROGRESS4) {
-		if (CastE > CastingE) CastingE = CastE;
-		CastF = FLAG_COMPLETE;
-	}
-
-	// evaluate if we are taking too long, or immobilize/memorize event failed.
-	if (CastF != FLAG_COMPLETE) {
-		if (StopE == DONE_ABORTED || MemoE == DONE_ABORTED || MQGetTickCount64() > CastM) {
-			WriteChatf("[%llu] MQ2Bot:[Casting]: Aborting because it took too long! (%s)", MQGetTickCount64(), StopE == DONE_ABORTED ? "Immobilized" : (MemoE == DONE_ABORTED ? "Memorization Fail" : "Timer Expired"));
-			CastF = FLAG_PROGRESS4;
-			CastE = CAST_NOTREADY;
-		}
-	}
-
-	// waiting for opportunity to start casting, end if conditions not favorables.
-	if (CastF == FLAG_PROGRESS1) {
-		if (pCastingWnd && (PCSIDLWND)pCastingWnd->dShow) return; // casting going on
-		if (!CastS) {
-			CastE = CAST_NOTREADY;
-			CastF = DONE_PROGRESS;
-			return;
-		}
-
-		CastingC = CastS->ID;
-
-		CastF = FLAG_PROGRESS4;
-		if (TargC && (!pTarget || (pTarget && ((PSPAWNINFO)pTarget)->SpawnID != TargC))) {
-			if (CastW == RECAST_LAND) CastE = CAST_ABORTED;
-		}
-		else if (Invisible && GetCharInfo()->pSpawn->HideMode) {
-			CastE = CAST_INVISIBLE;
-		}
-		else if (GetCharInfo()->Stunned) {
-			CastE = CAST_STUNNED;
-		}
-		else if (StopF != FLAG_COMPLETE || MemoF != FLAG_COMPLETE) {
-			CastF = FLAG_PROGRESS1;
-		}
-		else {
-			long TimeReady = SpellReady(spell.ID) ? 0 : (long)spell.Spell->RecoveryTime;    // get estimate time before it's ready.
-			if (TimeReady > 3000)  CastE = CAST_NOTREADY;   // if estimate higher than 3 seconds aborts.
-			else if (!TimeReady) CastF = FLAG_PROGRESS2;  // estimate says it's ready so cast it
-			else CastF = FLAG_PROGRESS1;                 // otherwise give it some time to be ready.
-		}
-	}
-
-	// we got the final approbation to cast, so lets do it.
-	if (CastF == FLAG_PROGRESS2) {
-		DebugWrite("[%llu] MQ2Bot:[Casting]: Cast.", MQGetTickCount64());
-		Success(CastS);
-		CastF = FLAG_PROGRESS3;
-		CastE = DONE_PROGRESS;
-		CastingT = MQGetTickCount64() + CastT + 250 + (pConnection->Last) * 4;
-		CastingE = DONE_PROGRESS;
-		CastingC = CastS->ID;
-		if ((long)GetCharInfo()->pSpawn->CastingData.SpellID > 0) {
-			CastingX = (CastingE < CAST_SUCCESS) ? CAST_SUCCESS : CastingE;
-			CastingL = CastingC;
-			if (CastK == TYPE_SPELL) {
-				sprintf_s(flag, "/multiline ; /stopsong ; /cast \"%s\"", CastN);
-				HideDoCommand(GetCharInfo()->pSpawn, flag, FromPlugin);
-			}
-			else if (CastK == TYPE_AA) {
-				sprintf_s(flag, "/alt activate %d", spell.ID);
-				HideDoCommand(GetCharInfo()->pSpawn, flag, FromPlugin);
-			}
-			else if (CastK == TYPE_ITEM) {
-				sprintf_s(flag, "/multiline ; /stopsong ; /useitem \"%s\"", CastN);
-				HideDoCommand(GetCharInfo()->pSpawn, flag, FromPlugin);
-			}
-		}
-		else {
-			char castN[MAX_STRING];
-			sprintf_s(castN, "\"%s\"", spell.SpellName);
-			if (CastK == TYPE_SPELL)     Cast(GetCharInfo()->pSpawn, castN);
-			else if (CastK == TYPE_AA) {
-				sprintf_s(flag, "/alt activate %d", spell.ID);
-				HideDoCommand(GetCharInfo()->pSpawn, flag, FromPlugin);
-			}
-			else if (CastK == TYPE_ITEM) {
-				sprintf_s(flag, "/multiline ; /stopsong ; /useitem \"%s\"", CastN);
-				HideDoCommand(GetCharInfo()->pSpawn, flag, FromPlugin);
-			}
-		}
-		Announce(spell);
-	}
-}
-
-long GEMID(DWORD ID) {
-	for (int GEM = 0; GEM < NUM_SPELL_GEMS; GEM++) if (GetCharInfo2()->MemorizedSpells[GEM] == ID) return GEM;
-	return NOID;
-}
-bool Flags() {
-	if (pCastingWnd && (PCSIDLWND)pCastingWnd->dShow) { DebugWrite("MQ2Bot: pCastingWnd=TRUE"); return true; }
-	if (CastF != FLAG_COMPLETE) { DebugWrite("MQ2Bot: CastF!=FLAG_COMPLETE"); return true; }
-	if (DuckF != FLAG_COMPLETE) { DebugWrite("MQ2Bot: DuckF!=FLAG_COMPLETE"); return true; }
-	if (MemoF != FLAG_COMPLETE) { DebugWrite("MQ2Bot: MemoF!=FLAG_COMPLETE"); return true; }
-	if (StopF != FLAG_COMPLETE) { DebugWrite("MQ2Bot: StopF!=FLAG_COMPLETE"); return true; }
-	if (MoveS != FLAG_COMPLETE) { DebugWrite("MQ2Bot: MoveS!=FLAG_COMPLETE"); return true; }
-	if (MoveF != FLAG_COMPLETE) { DebugWrite("MQ2Bot: MoveF!=FLAG_COMPLETE"); return true; }
-	if (MoveP != FLAG_COMPLETE) { DebugWrite("MQ2Bot: MoveP!=FLAG_COMPLETE"); return true; }
-	if (MoveA != FLAG_COMPLETE) { DebugWrite("MQ2Bot: MoveA!=FLAG_COMPLETE"); return true; }
-	return false;
-}
-
-void BotCastCommand(_BotSpell &spell) {
-	Resultat = CAST_DISTRACTED;
-	if (!gbInZone || Flags() || (pSpellBookWnd && (PCSIDLWND)pSpellBookWnd->dShow))
-	{
-		DebugWrite("[%llu] MQ2Bot:[Casting]: Complete. [%s (%d)][%s%s%s%s]", MQGetTickCount64(), cast_status[Resultat], Resultat,
-			!gbInZone ? " ZONE " : "", Flags() ? " FLAGS " : "", (pSpellBookWnd && (PCSIDLWND)pSpellBookWnd->dShow) ? " SHOW " : "");
-		return;
-	}
-	Reset();
-	Resultat = CAST_SUCCESS;
-	Invisible = false;
-	if (GetCharInfo()->Stunned)                            Resultat = CAST_STUNNED;
-	else if (Invisible && GetCharInfo()->pSpawn->HideMode) Resultat = CAST_INVISIBLE;
-	//else if (!SpellFind(CastN, CastC))                      Resultat = CAST_UNKNOWN;
-	//else if (fTYPE != TYPE_SPELL && !SpellReady(spell.ID)) Resultat = CAST_NOTREADY;
-	if (spell.Spell->TargetType != 14 && spell.Spell->TargetType != 6 && spell.Spell->TargetType != 3 && spell.Spell->TargetType != 41) //&& spell.Spell->TargetType != 45
-		if (PSPAWNINFO Target = (PSPAWNINFO)GetSpawnByID(TargI)) *(PSPAWNINFO*)ppTarget = Target;
-		else Resultat = CAST_NOTARGET;
-		if (Resultat == CAST_SUCCESS && spell.Type == TYPE_SPELL) {
-			if (BardClass) {
-				if (GetCharInfo()->pSpawn->CastingData.SpellID) EzCommand("/stopsong");
-			}
-			CastG = GEMID(spell.ID);
-			if (CastG == NOID) {
-				CastG = atoi(&spell.Gem[(_strnicmp(spell.Gem, "gem", 3)) ? 0 : 3]) - 1;
-				MemoLoad(CastG, spell.Spell);
-				SpellTotal = 1;
-				MemoF = FLAG_REQUEST;
-				MemoE = DONE_SUCCESS;
-			}
-
-		}
-		if (Resultat != CAST_SUCCESS) {
-			DebugWrite("[%llu] MQ2Bot:[Casting]: Complete. [%s (%d)]", MQGetTickCount64(), cast_status[Resultat], Resultat);
-			return;
-		}
-		CastF = FLAG_REQUEST;
-		CastI = spell.Spell;
-		CastK = spell.Type;
-		CastT = spell.CastTime;
-		CastS = spell.Spell;
-		CastM = MQGetTickCount64() + DELAY_CAST;
-		strcpy_s(CastN, spell.SpellName);
-		DebugWrite("[%llu] MQ2Bot:[Casting]: Name<%s> Type<%d>.", MQGetTickCount64(), CastN, CastK);
-		CastHandle(spell);
-}
-// NEW end functions
-
-#pragma endregion MQ2CastCode
 #pragma warning ( pop )
 
 #endif MQ2Bot2
