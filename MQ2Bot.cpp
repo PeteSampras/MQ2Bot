@@ -57,6 +57,10 @@ DebugSpewAlways("MQ2Bot::LoadZoneTargets() **Exception**");
 #include <cstdio>
 using namespace std;
 #include <algorithm>
+
+//renji: include api for MQ2DanNet
+#include "MQ2DanNet.h"
+
 /*
 #ifndef MMOBUGS
 extern char PLUGIN_NAME[MAX_PATH];
@@ -2925,6 +2929,9 @@ void PluginOn()
 	AddCommand("/bot", BotCommand);
 	AddCommand("/botlist", ListCommand);
 	AddCommand("/memmed", MemmedCommand);
+
+	//renji: mq2dannet example call
+	WriteChatf("%s", MQ2DanNet::Node::get().get_info().c_str());
 }
 
 void PluginOff()
