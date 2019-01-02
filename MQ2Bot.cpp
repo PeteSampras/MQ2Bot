@@ -1116,6 +1116,9 @@ void CheckGroup()
 			gMember.Spawn = pChar->pSpawn;
 			gMember.ID = pChar->pSpawn->SpawnID;
 			gMember.State = SPAWN_PLAYER;
+			gMember.PetID = 0;
+			if (pChar->pSpawn->PetID && pChar->pSpawn->PetID > 0)
+				gMember.PetID = pChar->pSpawn->PetID;
 			vGroup[0] = gMember;
 			return;
 		}
@@ -1142,8 +1145,8 @@ void CheckGroup()
 							gMember.ID = pGroupMember->SpawnID;
 							gMember.State = STANDSTATE_DEAD;
 							gMember.PetID = 0;
-							if (pChar->pSpawn->PetID && pChar->pSpawn->PetID > 0)
-								gMember.PetID = pChar->pSpawn->PetID;
+							if (pGroupMember->PetID && pGroupMember->PetID > 0)
+								gMember.PetID = pGroupMember->PetID;
 							vGroup[i] = gMember;
 						}
 						if (pGroupMember && !pGroupMember->RespawnTimer && pGroupMember->StandState != STANDSTATE_DEAD)
@@ -1155,8 +1158,8 @@ void CheckGroup()
 								gMember.ID = pGroupMember->SpawnID;
 								gMember.State = SPAWN_PLAYER;
 								gMember.PetID = 0;
-								if (pChar->pSpawn->PetID && pChar->pSpawn->PetID > 0)
-									gMember.PetID = pChar->pSpawn->PetID;
+								if (pGroupMember->PetID && pGroupMember->PetID > 0)
+									gMember.PetID = pGroupMember->PetID;
 								vGroup[i] = gMember;
 							}
 						}
