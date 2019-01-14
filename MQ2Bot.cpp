@@ -58,8 +58,62 @@ DebugSpewAlways("MQ2Bot::LoadZoneTargets() **Exception**");
 using namespace std;
 #include <algorithm>
 
-//renji: include api for MQ2DanNet
-#include "MQ2DanNet.h"
+//renji: using a define for now so we can disable it on the fly if we need to
+#define _BOT_NETAPI_
+#ifdef _BOT_NETAPI_
+#include "NetAPI_EQBC.h"
+
+enum BotPacketType {
+	Unknown = 0,
+	Vitals = 1,
+	Something = 2,
+	Buff = 3,
+	Another = 4,
+};
+
+void NetAPITestCommand1(PSPAWNINFO pChar, PCHAR szLine)
+{
+	DebugSpewAlways("::NetAPITestCommand1::");
+	if (EQBCConnected() && EQBCHooked())
+	{
+		if (PCHARINFO2 pChar2 = GetCharInfo2())
+		{
+			int slot = 0;
+			if (IsNumber(szLine))
+				slot = atoi(szLine);
+			if (slot < 0 || slot > NUM_BUFF_SLOTS)
+				slot = 0;
+			EQBCSendPacket(BotPacketType::Buff, sizeof(pChar2->Buff[slot]), 0, (byte*)&pChar2->Buff[slot]);
+		}
+	}
+}
+
+void OnIncomingBotPacket(PCHAR from, WORD packetType, WORD payloadSize, ULONGLONG qwExtra, const uint8_t *payloadData)
+{
+	DebugSpewAlways("Incoming packet from %s. Type=%u, size=%u", from, packetType, payloadSize);
+	//write our own handlers for packets
+	switch (packetType)
+	{
+	case BotPacketType::Buff:
+		{
+			_SPELLBUFF spbuff = { 0 };
+			//memcpy_s(&buff, sizeof(buff), payloadData, payloadSize);
+			memcpy((PSPELLBUFF)&spbuff, payloadData, sizeof(SPELLBUFF));
+			if (PSPELL pSpell = GetSpellByID(spbuff.SpellID))
+			{
+				WriteChatf("Received buff information from %s", from);
+				WriteChatf("Buff:\n    Name\ay=\ax%s\n    ID\ay=\ax%u\n    Duration\ay=\ax%u\n    Duration3\ay=\ax%u", pSpell->Name, spbuff.SpellID, spbuff.Duration, spbuff.Duration3);
+			}
+			break;
+		}
+		default:
+		{
+			WriteChatf("\ayNetAPI: Unknown packet type \"%u\".", packetType);
+			break;
+		}
+	}
+}
+#endif
 
 /*
 #ifndef MMOBUGS
@@ -2930,8 +2984,20 @@ void PluginOn()
 	AddCommand("/botlist", ListCommand);
 	AddCommand("/memmed", MemmedCommand);
 
-	//renji: mq2dannet example call
-	WriteChatf("%s", MQ2DanNet::Node::get().get_info().c_str());
+#ifdef _BOT_NETAPI_
+	//disable mq2netbots
+	if (GetModuleHandle("mq2netbots"))
+		EzCommand("/plugin mq2netbots unload");
+
+	//hook the netbots callback from eqbc
+	if (!HookNetBotsCallback())
+	{
+		WriteChatf("\arERROR: Failed to hook netbots callback");
+		nextHookAttempt = MQGetTickCount64() + 10000; //try again in 10seconds
+	}
+
+	AddCommand("/botapi", NetAPITestCommand1);
+#endif
 }
 
 void PluginOff()
@@ -2939,6 +3005,16 @@ void PluginOff()
 	RemoveCommand("/bot");
 	RemoveCommand("/botlist");
 	RemoveCommand("/memmed");
+
+#ifdef _BOT_NETAPI_
+	//remove the netbots hook
+	if (!UnhookNetBotsCallback())
+	{
+		WriteChatf("\ay[MQ2Bot] Failed to unhook netbots callback. Recommend manually reloading MQ2EQBC!");
+	}
+
+	RemoveCommand("/botapi");
+#endif
 }
 
 // Called when plugin is loading
@@ -2958,6 +3034,17 @@ PLUGIN_API VOID OnPulse(VOID)
 {
 	if (!InGameOK())
 		return;
+
+#ifdef _BOT_NETAPI_
+	if (!EQBCHooked() && MQGetTickCount64() > nextHookAttempt)
+	{
+		if (!HookNetBotsCallback())
+		{
+			DebugSpewAlways("MQ2Bot::NetAPI Failed to hook netbots callback");
+			nextHookAttempt = MQGetTickCount64() + 10000;
+		}
+	}
+#endif
 
 	if (!ConfigureLoaded)
 		return;
