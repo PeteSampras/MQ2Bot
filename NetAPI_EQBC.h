@@ -4,10 +4,14 @@
 #include "z85.h"
 
 typedef unsigned long DWORD;
-#define OFFSET_NETBOTS_STRING 0x4A2B4
-#define OFFSET_EQBC_INSTANCE 0x5AC58
-#define OFFSET_TRANSMIT_FUNC 0x81A0
-typedef void(__thiscall *fEQBCTransmit)(void *instConnectionManager, bool bHandleDisconnect, char* szMsg);
+#define OFFSET_NETBOTS_STRING_VANILLA 0x4A2B4
+#define OFFSET_NETBOTS_STRING_MMOBUGS 0xD4E0
+//vanilla 2830
+//mmobugs 3450
+//#define OFFSET_EQBC_INSTANCE 0x5AC58
+//#define OFFSET_TRANSMIT_FUNC 0x81A0
+//typedef void(__thiscall *fEQBCTransmit)(void *instConnectionManager, bool bHandleDisconnect, char* szMsg);
+typedef void(__cdecl *fEQBCTransmit)(char *szMsg);
 //void __thiscall CConnectionMgr::Transmit(CConnectionMgr *this, bool bHandleDisconnect, char *szMsg)
 
 extern void OnIncomingBotPacket(PCHAR from, WORD packetType, WORD payloadSize, ULONGLONG qwExtra, const uint8_t *payloadData);
@@ -42,18 +46,31 @@ bool EQBCHooked()
 	return bHooked;
 }
 
+//void EQBCTransmit(char* szMsg)
+//{
+//	if (HMODULE hMod = GetModuleHandle("mq2eqbc"))
+//	{
+//		void* instance = (void*)(DWORD(hMod) + OFFSET_EQBC_INSTANCE);
+//		if (instance)
+//		{
+//			fEQBCTransmit RawEQBCTransmit = (fEQBCTransmit)(DWORD(hMod) + OFFSET_TRANSMIT_FUNC);
+//			if (RawEQBCTransmit)
+//			{
+//				RawEQBCTransmit(instance, true, szMsg);
+//			}
+//		}
+//	}
+//}
+
 void EQBCTransmit(char* szMsg)
 {
 	if (HMODULE hMod = GetModuleHandle("mq2eqbc"))
 	{
-		void* instance = (void*)(DWORD(hMod) + OFFSET_EQBC_INSTANCE);
-		if (instance)
+		fEQBCTransmit EQBCTransmit = (fEQBCTransmit)GetProcAddress(hMod, "NetBotSendMsg");
+		if (EQBCTransmit)
 		{
-			fEQBCTransmit RawEQBCTransmit = (fEQBCTransmit)(DWORD(hMod) + OFFSET_TRANSMIT_FUNC);
-			if (RawEQBCTransmit)
-			{
-				RawEQBCTransmit(instance, true, szMsg);
-			}
+			WriteChatf("NetBotSendMsg address = %x", (DWORD)EQBCTransmit-(DWORD)hMod);
+			EQBCTransmit(szMsg);
 		}
 	}
 }
@@ -66,7 +83,18 @@ bool HookNetBotsCallback()
 	//hook the callback
 	if (HMODULE hMod = GetModuleHandle("mq2eqbc"))
 	{
-		PCHAR szNetBots = (PCHAR)(DWORD(hMod) + OFFSET_NETBOTS_STRING);
+		//check which version is loaded
+		DWORD dwAddr = (DWORD)GetProcAddress(hMod, "NetBotSendMsg");
+		if (dwAddr == ((DWORD)hMod + 0x2830))
+			dwAddr = DWORD(hMod) + OFFSET_NETBOTS_STRING_VANILLA;
+		else if (dwAddr == ((DWORD) + 0x3450))
+			dwAddr = DWORD(hMod) + OFFSET_NETBOTS_STRING_MMOBUGS;
+		else
+		{
+			DebugSpewAlways("MQ2Bot::NetAPI Unreocgnized compile of MQ2EQBC.dll");
+			return false;
+		}
+		PCHAR szNetBots = (PCHAR)(dwAddr);
 		if (szNetBots && !_stricmp(szNetBots, "mq2netbots"))
 		{
 			DebugSpewAlways("::MQ2BOT:: Hijacking mq2netbots callback");
@@ -94,7 +122,18 @@ bool UnhookNetBotsCallback()
 	//unhook the callback
 	if (HMODULE hMod = GetModuleHandle("mq2eqbc"))
 	{
-		PCHAR szNetBots = (PCHAR)(DWORD(hMod) + OFFSET_NETBOTS_STRING);
+		//check which version is loaded
+		DWORD dwAddr = (DWORD)GetProcAddress(hMod, "NetBotSendMsg");
+		if (dwAddr == ((DWORD)hMod + 0x2830))
+			dwAddr = DWORD(hMod) + OFFSET_NETBOTS_STRING_VANILLA;
+		else if (dwAddr == ((DWORD)+0x3450))
+			dwAddr = DWORD(hMod) + OFFSET_NETBOTS_STRING_MMOBUGS;
+		else
+		{
+			DebugSpewAlways("MQ2Bot::NetAPI Unreocgnized compile of MQ2EQBC.dll");
+			return false;
+		}
+		PCHAR szNetBots = (PCHAR)(dwAddr);
 		if (szNetBots && !_stricmp(szNetBots, "mq2bot"))
 		{
 			DebugSpewAlways("::MQ2BOT:: Removing hijack on mq2netbots callback");
@@ -159,8 +198,8 @@ void EQBCSendPacket(WORD packetType, WORD payloadSize, ULONGLONG qwExtra, LPCVOI
 		strcat_s(szBuffer1, bufsize, szBuffer2);
 		strcat_s(szBuffer1, bufsize, "|[NB]");
 
-		strcpy_s(szTemp, 7, "\tNBMSG");
-		EQBCTransmit(szTemp);
+		//strcpy_s(szTemp, 7, "\tNBMSG");
+		//EQBCTransmit(szTemp);
 		EQBCTransmit(szBuffer1);
 	}
 }
@@ -230,18 +269,3 @@ PLUGIN_API VOID OnNetBotMSG(PCHAR Name, PCHAR Msg) {
 
 	}
 }
-
-//void EQBCBroadCast(PCHAR Buffer) {
-//	typedef VOID(__cdecl *fEqbcNetBotSendMsg)(PCHAR);
-//	if (strlen(Buffer) > 9) {
-//		PMQPLUGIN pLook = pPlugins;
-//		while (pLook && _strnicmp(pLook->szFilename, "mq2eqbc", 8)) pLook = pLook->pNext;
-//		if (pLook)
-//			if (fEqbcNetBotSendMsg requestf = (fEqbcNetBotSendMsg)GetProcAddress(pLook->hModule, "NetBotSendMsg")) {
-//#if    DEBUGGING>1
-//				DebugSpewAlways("%s->BroadCasting(%s)", PLUGIN_NAME, Buffer);
-//#endif DEBUGGING
-//				requestf(Buffer);
-//			}
-//	}
-//}
