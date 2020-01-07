@@ -6,7 +6,7 @@ I am happy to use this as a community forum for contributions and will keep it o
 If nobody contributes or only MMOBugs developers contribute then I would eventually make this source private as it neared completion. 
 
 Project Board:
-- [GLO Board]: https://app.gitkraken.com/glo/board/Xg3hmI40NwAQ87cJ
+- [Project Board][GLO_Board]
 
 Details on the old project can be found at. 
 - The [MQ2Bot Forums][forum] of the [MMOBugs][mmobugs] site.
@@ -14,6 +14,7 @@ Details on the old project can be found at.
 - You can [email][email] me if you have questions and want to contribute. I am also in the MMOBugs discord.
 - If you like the project and just want to [Donate][donate], that is always appreciated.
 
+[GLO_Board]: https://app.gitkraken.com/glo/board/Xg3hmI40NwAQ87cJ
 [mmobugs]: https://www.mmobugs.com/
 [forum]: https://www.mmobugs.com/forums/forum132/
 [wiki]: http://www.mmobugs.com/wiki/index.php/MQ2Bot
