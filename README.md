@@ -5,6 +5,9 @@ The old plugin worked okay but had some design limitations that required a rewri
 I am happy to use this as a community forum for contributions and will keep it open source if that happens. 
 If nobody contributes or only MMOBugs developers contribute then I would eventually make this source private as it neared completion. 
 
+Project Board:
+- [GLO Board]:https://app.gitkraken.com/glo/board/Xg3hmI40NwAQ87cJ
+
 Details on the old project can be found at. 
 - The [MQ2Bot Forums][forum] of the [MMOBugs][mmobugs] site.
 - The [Wiki][wiki] is also available there.
