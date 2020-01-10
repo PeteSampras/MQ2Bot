@@ -1,24 +1,4 @@
 /* notes:
-Specific notes:
-FixNote 20160728.1 - Need to check vSpawn, if not there, insert vAdd to there, also double check the vAdds[i].Add flag.
-FixNote 20160728.2 - this check will need readded for AACutOffTime
-FixNote 20160731.1  might need to add more members here, but for now just setting ID and spawn
-
-General notes overall:
-Safety string and POSIX updates complete.
-
-General notes spells:
-Fully flesh out AAs, disc, heals before moving on.  No need to redo all routines 20 times for no reason.
-
-General notes spawns/storage:
-vAdds need checked against vSpawn, the Spawns need to be populated, and then both checked/cleared via OnRemoveSpawn
-KillTarget needs to get set somehow.  can re-use some/most of mq2bot code GetKillTarget() for that.
-Once we have kill target, each detrimental spell needs to have it added to their target struct member.
-
-General notes casting/spell storage:
-I think the CastHandle would actually work as is, but it can be more efficient by adding struct members directly (this is sort of done) so that checks dont need made multiple times for unchanging members.
-
-
 save for later:
 // to use discs: pCharData->DoCombatAbility(vMaster[i].ID);
 try
@@ -61,9 +41,13 @@ DebugSpewAlways("MQ2Bot::LoadZoneTargets() **Exception**");
 using namespace std;
 #include <algorithm>
 #pragma comment(lib, "Shlwapi.lib")
+#ifdef MMOBUGS
+#undef MMOBUGS
+#endif
 
-//char PLUGIN_NAME[MAX_PATH] = "MQ2Bot"; // this needs reenabled when not using mmobugs source code
-PreSetup("MQ2Bot");
+extern char MYPLUGIN_NAME[MAX_PATH] = "MQ2BotBeta"; // this needs reenabled when not using mmobugs source code
+PreSetup("MQ2BotBeta");
+#define MMOBUGS 1
 
 // defines
 #define NewSource 1
@@ -85,15 +69,18 @@ enum OPTIONS { // used to check routines automatically
 	IMHIT, JOLT, KNOCKBACK, LIFETAP, MAINTANKBUFF, MANA, NUKE, NUKETOT, PET, REZ,
 	ROOT, SELFBUFF, SNARE, SUMMONITEM, SWARM, DISC, CURE, MEZ
 };
-enum TARGETTYPE { UNKNOWN, LoS, AE_PCv1, Group_v1, PB_AE, Single, Self, Ignore, Targeted_AE, Animal, Undead, Summoned, Lifetap = 13, 
-	Pet=14, Corpse, Plant, UberGiants, UberDragons, Targeted_AE_Tap=20, AE_Undead=24, AE_Summoned=25, Hatelist=32, Hatelist2=33, Chest=34,
-	SpecialMuramites=35, Caster_PB_PC=36,Caster_PB_NPC=37,Pet2=38,NoPets=39,AE_PCv2=40,Group_v2=41,Directional_AE=42,SingleInGroup=43,
-	Beam=44,FreeTarget=45,TargetOfTarget=46,PetOwner=47, Target_AE_No_Players_Pets=50
+enum TARGETTYPE {
+	UNKNOWN, LoS, AE_PCv1, Group_v1, PB_AE, Single, Self, Ignore, Targeted_AE, Animal, Undead, Summoned, Lifetap = 13,
+	Pet = 14, Corpse, Plant, UberGiants, UberDragons, Targeted_AE_Tap = 20, AE_Undead = 24, AE_Summoned = 25, Hatelist = 32, Hatelist2 = 33, Chest = 34,
+	SpecialMuramites = 35, Caster_PB_PC = 36, Caster_PB_NPC = 37, Pet2 = 38, NoPets = 39, AE_PCv2 = 40, Group_v2 = 41, Directional_AE = 42, SingleInGroup = 43,
+	Beam = 44, FreeTarget = 45, TargetOfTarget = 46, PetOwner = 47, Target_AE_No_Players_Pets = 50
 };
 
-enum BUFFTYPE { NOTYPE, Charge, Aego, Skin, Focus, Regen, Symbol, Clarity, Pred, Strength, Brells, SV, SE, HybridHP, 
+enum BUFFTYPE {
+	NOTYPE, Charge, Aego, Skin, Focus, Regen, Symbol, Clarity, Pred, Strength, Brells, SV, SE, HybridHP,
 	Growth, Rune, Rune2, Shining, SpellHaste, MeleeProc, SpellProc, Invis, IVU, Levitate, MoveSpeed, Haste,
-	DS1, DS2, DS3, DS4, DS5, DS6, DS7, DS8, DS9, DS10, DS11, DS12, Tash, Malo, Snare, Root, Slow, Mez, Cripple, Fero, Retort, KillShotProc, Unity, DefensiveProc
+	DS1, DS2, DS3, DS4, DS5, DS6, DS7, DS8, DS9, DS10, DS11, DS12, Tash, Malo, Snare, Root, Slow, Mez, Cripple, Fero, Retort, KillShotProc, Unity, DefensiveProc,
+	Rune3, Preincarnation,
 };
 enum SKILLTYPES { TYPE_SPELL = 1, TYPE_AA = 2, TYPE_ITEM = 3, TYPE_DISC = 4 }; // struct for spell data, how to use the spell, and how the spell was used
 
@@ -192,16 +179,16 @@ typedef struct _BotSpell // has to be before the FunctionDeclarations because a 
 	int					UseInCombat;			// use the skill in combat? default yes combat skill/heals/fightbuffs, default no on buffs, pets, etc.
 	char				Classes[MAX_STRING] = { 0 }; // for buffs only. what classes should i buff this one?											
 	DWORD				GroupID;				// what is the group ID for ez access
-	BUFFTYPE			BuffType =::BUFFTYPE::NOTYPE;	// what BUFFTYPE enum is this, if any
+	BUFFTYPE			BuffType = ::BUFFTYPE::NOTYPE;	// what BUFFTYPE enum is this, if any
 	PSPELL				UnitySpell;				// whats my unified spell for this, if any
 												// save this just in case:  void(*CheckFunc)(std::vector<_BotSpell> &, int);
 	void(*CheckFunc)(int);
-} BotSpell, *PBotSpell;
+} BotSpell, * PBotSpell;
 
 typedef struct _BotItem // going to need this eventually
 {
 
-} BotItem, *PBotItem;
+} BotItem, * PBotItem;
 
 typedef struct _Buff
 {
@@ -214,7 +201,7 @@ typedef struct _Buff
 	BotSpell			Single;
 	BotSpell			Group;
 	BotSpell			Pet;
-} Buff, *PBuff;
+} Buff, * PBuff;
 
 typedef struct _Buffs
 {
@@ -259,7 +246,9 @@ typedef struct _Buffs
 	Buff				Levitate; // TODO: Code this in if valid requirement
 	Buff				MoveSpeed; // TODO: Code this in if valid requirement
 	Buff				DefensiveProc; // TODO:
-} Buffs, *PBuffs;
+	Buff				Rune3;
+	Buff				Preincarnation;
+} Buffs, * PBuffs;
 
 typedef struct _Debuffs
 {
@@ -295,11 +284,14 @@ typedef struct _Debuffs
 	BotSpell			MeleeProc; // TODO: Code this in if valid requirement
 	BotSpell			SpellProc; // TODO: Code this in if valid requirement
 	BotSpell			KillShotProc; // TODO: Code this in if valid requirement
-} Debuffs, *PDebuffs;
+} Debuffs, * PDebuffs;
 
 
 
 #pragma region FunctionDeclarations
+
+//
+void BuildBuff(_BotSpell& spell);
 // declaration of create functions
 void CreateAA();
 void CreateDisc();
@@ -347,7 +339,7 @@ void CheckSwarm(int spell);
 
 // declaration of general functions
 int			CalcDuration(PSPELL pSpell);
-void		BotCastCommand(_BotSpell &spell);
+void		BotCastCommand(_BotSpell& spell);
 VOID		DebugWrite(PCHAR szFormat, ...);
 void		EQBCSwap(char startColor[MAX_STRING]);
 double		botround(double d);
@@ -361,8 +353,8 @@ int			PctMana(PSPAWNINFO pSpawn);
 // declaration of spell functions
 void		DiscCategory(PSPELL pSpell);
 DWORD		GetSpellDuration2(PSPELL pSpell);
-void		PopulateIni(vector<_BotSpell> &v, char VectorName[MAX_STRING]);
-void		SortSpellVector(vector<_BotSpell> &v);
+void		PopulateIni(vector<_BotSpell>& v, char VectorName[MAX_STRING]);
+void		SortSpellVector(vector<_BotSpell>& v);
 void		SpellCategory(PSPELL pSpell);
 void		SkillType(char szName[MAX_STRING]);
 void		SpellType(PSPELL pSpell);
@@ -380,7 +372,7 @@ bool	BardClass = false, ConfigureLoaded = false, InCombat = false, summoned = fa
 // char declares
 char	AddList[MAX_STRING] = { 0 }, AssistName[MAX_STRING] = { 0 }, BodyTypeFix[MAX_STRING] = { 0 }, CurrentRoutine[MAX_STRING] = { 0 }, EQBCColor[MAX_STRING] = { 0 },
 INISection[MAX_STRING] = { 0 }, NetBotsName[MAX_STRING] = "NULL", spellCat[MAX_STRING] = { 0 }, spellType[MAX_STRING] = { 0 }, storeGem[10] = { 0 }, storeName[MAX_STRING] = { 0 },
-conColor[MAX_STRING] = { 0 }, DEBUG_DUMPFILE[MAX_STRING]={0};
+conColor[MAX_STRING] = { 0 }, DEBUG_DUMPFILE[MAX_STRING] = { 0 };
 
 char DSClasses[MAX_STRING], HasteClasses[MAX_STRING], AegoClasses[MAX_STRING], SkinClasses[MAX_STRING],
 SymbolClasses[MAX_STRING], FocusClasses[MAX_STRING], RegenClasses[MAX_STRING], ClarityClasses[MAX_STRING],
@@ -409,7 +401,7 @@ reinforcement = 0.00, WarpDistance = 0.00;
 ULONGLONG AssistTimer = 0, LastAnnouncedSpell = 0, SpellTimer = 0;
 
 // PSPELL declares
-PSPELL storeSpell, UnitySpell;
+PSPELL storeSpell, UnitySpell, invisgroup, invisself, ivugroup, ivuself, levitategroup, levitateself;
 
 //vector _BotSpell declares
 //vector<_BotSpell> vMaster, vMemmedSpells, vTemp;
@@ -433,7 +425,7 @@ vector<_Spawns> vGroup, vXTarget, vSpawns, vPets; // manage all the various spaw
 _Buffs MyBuffs;
 _Debuffs MyDebuffs;
 
-												  // vector string declares
+// vector string declares
 vector<string> vClicky;
 
 // map declares
@@ -447,8 +439,8 @@ deque<_Spawns>	vAdds;
 // unified lines: symbol, aego, bst SV/SE unity
 BotSpell
 //long duration buffs
-buffSelfSpellResist,buffSingleSpellResist,buffGroupSpellResist, // might need to break this out by class or resist type since there's so many.
-buffSingleResistCorruption,buffGroupResistCorruption, //maybe?
+buffSelfSpellResist, buffSingleSpellResist, buffGroupSpellResist, // might need to break this out by class or resist type since there's so many.
+buffSingleResistCorruption, buffGroupResistCorruption, //maybe?
 buffSelfHybridHP, // pal/sk self hp buffs
 buffSelfConvert, // SK/nec mana conversion
 buffSelfAttack, // SK attack buff
@@ -464,7 +456,7 @@ buffSelfPred, buffGroupPred, buffGroupStrength, // rng
 buffGroupBrells, //pal only
 buffGroupSV, buffGroupSE, //bst only
 //HybridHP, //not sure if i need this atm
-buffSelfDS, buffSingleDS, buffGroupDS, buffPetDS,
+buffSelfDS, buffSingleDS, buffGroupDS, 
 buffSingleFerocity, buffGroupFerocity, // dont use single if you have group
 // there are a ton of different lines for procs on hit or cast. many classes get 2, sometimes 3
 buffSelfMeleeProc, buffSingleMeleeProc, buffGroupMeleeProc,
@@ -480,11 +472,11 @@ buffSingleMoveSpeed, buffGroupMoveSpeed,
 buffSelfDefensiveProc, buffSingleDefensiveProc,
 buffSelfRune, buffSingleRune, buffGroupRune,
 buffSelfRune2, buffSingleRune2, buffGroupRune2,
-buffDivineIntervention, //clr
+
 //things i should only use if memmed.. high reuse timer or extremely short duration or both
-buffSingleRetort, buffSelfDivineAura, buffSingleDivineAura, buffSelfDivineAura2, buffYaulp, buffSingleShining, //clr.. ok clerics.. we get it. you are special
+buffSingleRetort, buffSelfDivineAura, buffSingleDivineAura, buffSelfDivineAura2, buffYaulp, buffSingleShining, buffDivineIntervention, //clr.. ok clerics.. we get it. you are special
 buffSelfWard, buffSingleWard,
-buffSingleGrowth;// dru/shm
+buffSingleGrowth;// dru/shm buffPetDS,
 
 // PCHAR declares
 PCHAR ChatColors[] = { "\ay", "\a-y", "\ao", "\a-o", "\ag", "\a-g", "\ab", "\a-b", "\ar", "\a-r",
@@ -498,17 +490,17 @@ PCHAR DefaultSection[] = { "AA", "Aggro","Aura","Bard","Buff","Call","Charm","Cl
 "ImHit","Jolt","KnockBack","Lifetap","MainTankBuff","Mana","Nuke","NukeToT","Pet","Rez",
 "Root","SelfBuff","Snare","SummonItem","Swarm", "Disc","Cure", "Mez", NULL }; // 10 per line
 PCHAR DefaultUseInCombat[] = { "1","1","0","1","0","1","1","1","0","1",
-"1","1","1","0","1","1","1","1","1","1", 
+"1","1","1","0","1","1","1","1","1","1",
 "1","1","1","1","1","0","1","1","0","1",
 "1","0","1","0","1","1","1","1",NULL }; // 10 per line
 PCHAR DefaultColor[] = { "\ap", "\a-r","\a-m","\a-t","\aw","\ao","\am","\a-o","\a-o","\a-o",
 "\a-o","\ay","\ay","\ag","\a-w","\am","\a-g","\at","\a-t","\a-t",
 "\ay","\at","\a-g","\ag","\ag","\ao","\ar","\a-t","\a-t","\a-o",
 "\a-g","\aw","\a-g","\a-o","\a-r", "\a-y","\ag","\a-m", NULL };// 10 per line
-PCHAR DefaultPriority[] = { "300","900", "0", "0", "0", "0", "0", "0", "0", "0",
-"00","800", "700", "0", "950", "0", "0", "990", "850", "0",
-"980","1000", "0", "910", "0", "0", "450", "0", "0", "0",
-"500","0", "750", "0", "720","600","0", "1000", NULL };// 10 per line
+PCHAR DefaultPriority[] = { "300","900", "1", "1", "1", "1", "1", "1", "1", "1",
+"400","800", "700", "1", "950", "1", "1", "990", "850", "1",
+"980","1000", "1", "910", "1", "1", "450", "1", "1", "1",
+"500","1", "750", "1", "720","600","1", "1000", NULL };// 10 per line
 PCHAR DefaultStartAt[] = { "99","100", "100", "100", "100", "100", "100", "100", "100", "100",
 "99","100", "99", "17", "50", "100", "100", "80", "80", "80",
 "80","70", "100", "80", "100", "80", "99", "99", "100", "100",
@@ -548,7 +540,7 @@ inline bool InGameOK()
 }
 
 // Returns TRUE if the specified UI window is visible
-static inline BOOL WinState(CXWnd *Wnd)
+static inline BOOL WinState(CXWnd* Wnd)
 {
 	return (Wnd && ((PCSIDLWND)Wnd)->IsVisible());
 }
@@ -571,7 +563,7 @@ static inline LONG GetSpellCalcX(PSPELL spell, int slot) {
 #pragma endregion Inlines
 
 #pragma region GeneralFunctionDefinitions
-void Announce(_BotSpell &spell)
+void Announce(_BotSpell& spell)
 {
 	if (PSPAWNINFO pSpawn = (PSPAWNINFO)GetSpawnByID(spell.TargetID))
 	{
@@ -626,17 +618,17 @@ DWORD ChkCreateDir(char* pszDir)
 
 VOID DebugWrite(PCHAR szFormat, ...)
 {
-	if (_stricmp(DEBUG_DUMPFILE,"all") && _stricmp(DEBUG_DUMPFILE,CurrentRoutine))
+	if (_stricmp(DEBUG_DUMPFILE, "all") && _stricmp(DEBUG_DUMPFILE, CurrentRoutine))
 		return;
 	try
 	{
 		va_list vaList;
 		va_start(vaList, szFormat);
 		int len = _vscprintf(szFormat, vaList) + 1;
-		if (char *szOutput = (char *)LocalAlloc(LPTR, len + 32))
+		if (char* szOutput = (char*)LocalAlloc(LPTR, len + 32))
 		{
 			vsprintf_s(szOutput, len + 32, szFormat, vaList);
-			FILE *fOut = NULL;
+			FILE* fOut = NULL;
 			CHAR Filename[MAX_STRING] = { 0 };
 			CHAR szBuffer[MAX_STRING] = { 0 };
 			DWORD i;
@@ -677,15 +669,15 @@ VOID DebugWrite(PCHAR szFormat, ...)
 			LocalFree(szOutput);
 		}
 	}
-	catch (exception &e)
+	catch (exception & e)
 	{
 		sprintf_s(DEBUG_DUMPFILE, NULL);
-		FatalError("[%s::%s] Severe Error: %s : %s", PLUGIN_NAME, __FUNCTION__, e.what(), typeid(e).name());
+		//FatalError("[%s::%s] Severe Error: %s : %s", MYPLUGIN_NAME, __FUNCTION__, e.what(), typeid(e).name());
 	}
 	catch (...)
 	{
 		sprintf_s(DEBUG_DUMPFILE, NULL);
-		FatalError("[%s::%s] Severe Error: Unknown", PLUGIN_NAME, __FUNCTION__);
+		//FatalError("[%s::%s] Severe Error: Unknown", MYPLUGIN_NAME, __FUNCTION__);
 	}
 }
 
@@ -720,7 +712,7 @@ void DurationSetup()
 				if (PlayerHasAAAbility(Index))
 					for (int j = 0; j < AA_CHAR_MAX_REAL; j++) {
 						if (pPCData->GetAlternateAbilityId(j) == Index)
-							reinforcement = (float)(0.025*GetCharInfo2()->AAList[j].PointsSpent);
+							reinforcement = (float)(0.025 * GetCharInfo2()->AAList[j].PointsSpent);
 						if (reinforcement > 0.01 || !pPCData->GetAlternateAbilityId(j))
 							break;
 					}
@@ -874,7 +866,7 @@ int PctMana(PSPAWNINFO pSpawn)
 	return 0;
 }
 
-void PopulateIni(vector<_BotSpell> &v, char VectorName[MAX_STRING])
+void PopulateIni(vector<_BotSpell>& v, char VectorName[MAX_STRING])
 {
 	char szTemp[MAX_STRING] = { 0 }, szSpell[MAX_STRING];
 	int vSize = v.size();
@@ -1014,7 +1006,7 @@ bool SpellStacks(PSPELL pSpell)
 	}
 	//check disc
 	if (pCombatAbilityWnd) {
-		if (CXWnd *Child = ((CXWnd*)pCombatAbilityWnd)->GetChildItem("CAW_CombatEffectLabel")) {
+		if (CXWnd* Child = ((CXWnd*)pCombatAbilityWnd)->GetChildItem("CAW_CombatEffectLabel")) {
 			CHAR szBuffer[2048] = { 0 };
 			if (GetCXStr(Child->CGetWindowText(), szBuffer, 2047) && szBuffer[0] != '\0') {
 				PSPELL tmpSpell = GetSpellByName(szBuffer);
@@ -1033,9 +1025,9 @@ bool SpellStacks(PSPELL pSpell)
 #pragma endregion GeneralFunctionDefinitions
 
 #pragma region SpawnFunctionDefinitions
-bool sortSpawnByPriority(const Spawns &lhs, const Spawns &rhs) { return lhs.Priority > rhs.Priority; } // Sort spawn vector by priority
+bool sortSpawnByPriority(const Spawns& lhs, const Spawns& rhs) { return lhs.Priority > rhs.Priority; } // Sort spawn vector by priority
 
-void SortSpawnVector(vector<_Spawns> &v)  // the actual sorting of a spawn vector by priority
+void SortSpawnVector(vector<_Spawns>& v)  // the actual sorting of a spawn vector by priority
 {
 	sort(v.begin(), v.end(), sortSpawnByPriority);
 }
@@ -1145,7 +1137,7 @@ void CheckAdds()
 		sprintf_s(assist, "/squelch /assist %s", AssistName);
 		if (PSPAWNINFO pMyTarget = (PSPAWNINFO)pTarget)
 		{
-			if (DistanceToSpawn(pChar->pSpawn, pMyTarget) > AssistRange && MQGetTickCount64() > AssistTimer)
+			if (DistanceToSpawn(pChar->pSpawn, pMyTarget) > AssistRange&& MQGetTickCount64() > AssistTimer)
 				doAssist = 1;
 		}
 		else
@@ -1527,7 +1519,7 @@ BOOL SpellReady(DWORD index)
 			if (PSPELL pSpell = GetSpellByID(GetMemorizedSpell(nGem)))
 			{
 				if (!_stricmp(mySpell->Name, pSpell->Name))
-					if (((PCDISPLAY)pDisplay)->TimeStamp >((PSPAWNINFO)pLocalPlayer)->SpellGemETA[nGem] && (int)((PCDISPLAY)pDisplay)->TimeStamp > ((PSPAWNINFO)pLocalPlayer)->GetSpellCooldownETA()) {
+					if (((PCDISPLAY)pDisplay)->TimeStamp > ((PSPAWNINFO)pLocalPlayer)->SpellGemETA[nGem] && (int)((PCDISPLAY)pDisplay)->TimeStamp > ((PSPAWNINFO)pLocalPlayer)->GetSpellCooldownETA()) {
 						return true;
 					}
 			}
@@ -1559,12 +1551,12 @@ typedef struct _Spawns
 	BYTE				State;
 } Spawns, *PSpawns, SpawnCopy;
 */
-void BuildSpawn(_Spawns &spawn)
+void BuildSpawn(_Spawns& spawn)
 {
 
 }
 
-void BuildSpell(_BotSpell &spell)
+void BuildSpell(_BotSpell& spell)
 {
 	bool bFound = false;
 	// blank out the id value
@@ -1574,7 +1566,7 @@ void BuildSpell(_BotSpell &spell)
 	SkillType(spell.Name);
 	spell.Spell = storeSpell;
 	spell.SpellIcon = storeSpell->SpellIcon;
-	if(!spell.Type)
+	if (!spell.Type)
 		spell.Type = storeType;
 	spell.ID = storeID;
 	spell.Prestige = storePrestige;
@@ -1588,17 +1580,17 @@ void BuildSpell(_BotSpell &spell)
 		SpellType(spell.Spell);
 	strcpy_s(spell.SpellCat, spellCat);
 	spell.BuffType = buffType;
-	if(strlen(spell.SpellType)<2)
+	if (strlen(spell.SpellType) < 2)
 		strcpy_s(spell.SpellType, spellType);
 	if (!spell.SpellTypeOption)
 		spell.SpellTypeOption = spellTypeOption;
-	if(!spell.CheckFunc)
+	if (!spell.CheckFunc)
 		spell.CheckFunc = spellFunc;
 
 	// check the ini otherwise use default settings
 	char szTemp[MAX_STRING] = { 0 }, szSpell[MAX_STRING], szClasses[MAX_STRING] = { 0 }, spellNum[10] = { 0 }, color[10] = { 0 }, szRank2[MAX_STRING] = { 0 }, szRank3[MAX_STRING] = { 0 };
 	int customSpells = GetPrivateProfileInt(INISection, "SpellTotal", 0, INIFileName);
-	int defStartAt = 0, defUse = 0, defStopAt = 0, defPriority = 0, defNamedOnly = 0, defUseOnce = 0, defForceCast = 0, defUseInCombat=0;
+	int defStartAt = 0, defUse = 0, defStopAt = 0, defPriority = 0, defNamedOnly = 0, defUseOnce = 0, defForceCast = 0, defUseInCombat = 0;
 	int found = 0;
 	for (int i = 0; DefaultSection[i]; i++)
 	{
@@ -1627,7 +1619,7 @@ void BuildSpell(_BotSpell &spell)
 		defNamedOnly = 0;
 		defUseOnce = 0;
 		defForceCast = 0;
-		defUseInCombat =0;
+		defUseInCombat = 0;
 	}
 	// actually search for it
 	for (int i = 1; i < customSpells; i++)
@@ -1676,7 +1668,7 @@ void BuildSpell(_BotSpell &spell)
 				{
 					sprintf_s(szClasses, "%sClasses", spell.SpellType);
 					GetPrivateProfileString(INISection, szClasses, "ALL", szTemp, MAX_STRING, INIFileName);
-					strcpy_s(spell.Classes,szTemp);
+					strcpy_s(spell.Classes, szTemp);
 				}
 			}
 		}
@@ -1732,7 +1724,7 @@ int CalcDuration(PSPELL pSpell)
 	return iCalc;
 }
 
-bool CanICast(_BotSpell &spell)
+bool CanICast(_BotSpell& spell)
 {
 	if (!InGameOK())
 		return false;
@@ -1763,7 +1755,14 @@ void CheckMemmedSpells()
 		return;
 	bool change = false;
 	bool bAlreadyInMaster = false;
-	bool bFound=false;
+	bool bFound = false;
+	//for (int i = 0; i < vMaster.size(); i++)
+	//{
+	//	if (vMaster[i].ID)
+	//	{
+	//		WriteChatf("\arMaster\aw::\am%d: \aw%s", i, vMaster[i].Name);
+	//	}
+	//}
 	try
 	{
 		if (pDisplay && pLocalPlayer)
@@ -1774,7 +1773,7 @@ void CheckMemmedSpells()
 				{
 					if (PSPELL pSpell = GetSpellByID(GetMemorizedSpell(nGem)))
 					{
-						if (nGem < vMemmedSpells.size() && pSpell->ID != vMemmedSpells[nGem].ID && vMemmedSpells[nGem].GroupID!=pSpell->SpellGroup)
+						if (nGem < vMemmedSpells.size() && pSpell->ID != vMemmedSpells[nGem].ID && vMemmedSpells[nGem].GroupID != pSpell->SpellGroup)
 						{
 							// change detected
 							change = true;
@@ -1782,12 +1781,21 @@ void CheckMemmedSpells()
 							int vSize = vMaster.size();
 
 							// Check if it is in master already
-							for (int i = 0; i<vSize; i++)
+							for (int i = 0; i < vSize; i++)
 							{
 								if (!_stricmp(vMaster[i].Name,pSpell->Name))
 								{
-									bAlreadyInMaster = true; //cool, i can skip my happy ass way down there then
-									WriteChatf("\arMQ2Bot\aw::\amKnown: \aw%s (%s)", vMemmedSpells[nGem].Name, vMemmedSpells[nGem].SpellCat);
+									bAlreadyInMaster = true; //cool, we know this spell so build it for vMemmed but not for vMaster
+									//store the old data
+									// not in master so let's build it
+									strcpy_s(vMemmedSpells[nGem].Name, pSpell->Name);
+									//store the old data
+									vMemmedSpells[nGem].PreviousID = vMemmedSpells[nGem].ID;
+									//build the new data
+									BuildSpell(vMemmedSpells[nGem]);
+									vMemmedSpells[nGem].ID = vMemmedSpells[nGem].ID;
+									WriteChatf("\arMQ2Bot\aw::\amKnown: \aw%s", vMemmedSpells[nGem].Name);
+									break;
 								}
 							}
 							if (!bAlreadyInMaster)
@@ -1926,7 +1934,7 @@ void DiscCategory(PSPELL pSpell)
 	if (pSpell->Subcategory == 152)
 	{
 		strcpy_s(spellCat, "Aggro");
-		spellTypeOption = ::OPTIONS::AGGRO; 
+		spellTypeOption = ::OPTIONS::AGGRO;
 		spellFunc = CheckAggro;
 		return;
 	}
@@ -1938,8 +1946,8 @@ void DiscCategory(PSPELL pSpell)
 	if (attrib0 == 31 || pSpell->Subcategory == 35 || pSpell->Category == 35)
 	{
 		strcpy_s(spellCat, "Mez");
-		spellTypeOption = ::OPTIONS::MEZ; 
-		spellFunc = CheckMez;  
+		spellTypeOption = ::OPTIONS::MEZ;
+		spellFunc = CheckMez;
 		buffType = ::BUFFTYPE::Mez;
 		return;
 	}
@@ -2036,22 +2044,22 @@ void DiscCategory(PSPELL pSpell)
 			if (attrib0_ == 444)
 			{
 				strcpy_s(spellCat, "Aggro");
-				spellTypeOption = ::OPTIONS::AGGRO; 
+				spellTypeOption = ::OPTIONS::AGGRO;
 				spellFunc = CheckAggro;
 				return;
 			}
 			if (HasSpellAttrib(pSpell2, 192))
 			{
 				strcpy_s(spellCat, "Aggro");
-				spellTypeOption = ::OPTIONS::AGGRO; 
+				spellTypeOption = ::OPTIONS::AGGRO;
 				spellFunc = CheckAggro;
 				return;
 			}
 			if (attrib0_ == 92 && GetSpellBase(pSpell2, 0) < 0)
 			{
 				strcpy_s(spellCat, "Jolt");
-				spellTypeOption = ::OPTIONS::JOLT; 
-				spellFunc = CheckJolt; 
+				spellTypeOption = ::OPTIONS::JOLT;
+				spellFunc = CheckJolt;
 				return;
 			}
 		}
@@ -2059,7 +2067,7 @@ void DiscCategory(PSPELL pSpell)
 	if (HasSpellAttrib(pSpell, 192))
 	{
 		strcpy_s(spellCat, "Aggro");
-		spellTypeOption = ::OPTIONS::AGGRO; 
+		spellTypeOption = ::OPTIONS::AGGRO;
 		spellFunc = CheckAggro;
 		return;
 	}
@@ -2086,7 +2094,7 @@ void DiscCategory(PSPELL pSpell)
 //	return false;
 //}
 
-bool FindSpell(PSPELL pSpell, vector<_BotSpell> &v)
+bool FindSpell(PSPELL pSpell, vector<_BotSpell>& v)
 {
 	int vSize = v.size();
 	for (int i = 0; i < vSize; i++)
@@ -2145,7 +2153,7 @@ DWORD GetSpellDuration2(PSPELL pSpell)
 	return pSpellDuration;
 }
 
-bool ShouldICast(_BotSpell &spell)
+bool ShouldICast(_BotSpell& spell)
 {
 	if (spell.If[0] != '\0')
 	{
@@ -2157,7 +2165,7 @@ bool ShouldICast(_BotSpell &spell)
 	}
 	if (PSPAWNINFO pSpawn = (PSPAWNINFO)GetSpawnByID(spell.MyTarget.ID))
 	{
-		if(spell.MyTarget.Add)
+		if (spell.MyTarget.Add)
 			if (spell.NamedOnly && !IsNamed(pSpawn) || PctHP(pSpawn) > AssistAt || PctHP(pSpawn) > spell.StartAt || PctHP(pSpawn) <= spell.StopAt || spell.UseOnce && spell.LastTargetID == pSpawn->SpawnID)
 				return false;
 		if (MQGetTickCount64() < SpellTimer || !GetCharInfo()->pSpawn || (GetCharInfo()->pSpawn->CastingData.SpellETA - GetCharInfo()->pSpawn->TimeStamp) > 0 && (GetCharInfo()->pSpawn->CastingData.SpellETA - GetCharInfo()->pSpawn->TimeStamp) < 30000)
@@ -2166,7 +2174,7 @@ bool ShouldICast(_BotSpell &spell)
 	return true;
 }
 
-bool ShouldICastDetrimental(_BotSpell &spell)
+bool ShouldICastDetrimental(_BotSpell& spell)
 {
 	if (!vAdds.size())
 		return false;
@@ -2177,9 +2185,9 @@ bool ShouldICastDetrimental(_BotSpell &spell)
 	return true;
 }
 
-bool sortByPriority(const BotSpell &lhs, const BotSpell &rhs) { return lhs.Priority > rhs.Priority; } // Sort spell vectors by priority
+bool sortByPriority(const BotSpell& lhs, const BotSpell& rhs) { return lhs.Priority > rhs.Priority; } // Sort spell vectors by priority
 
-void SortSpellVector(vector<_BotSpell> &v)  // the actual sorting of a spell vector by priority
+void SortSpellVector(vector<_BotSpell>& v)  // the actual sorting of a spell vector by priority
 {
 	sort(v.begin(), v.end(), sortByPriority);
 }
@@ -2436,7 +2444,7 @@ void SpellCategory(PSPELL pSpell)
 			if (GetSpellAttrib(pSpell, x) == 59)
 			{
 				sprintf_s(spellCat, "DS%d", x + 1);
-				buffType = (BUFFTYPE)(::BUFFTYPE::DS1+(BUFFTYPE)x);
+				buffType = (BUFFTYPE)(::BUFFTYPE::DS1 + (BUFFTYPE)x);
 				return;
 			}
 		}
@@ -2453,7 +2461,7 @@ void SpellCategory(PSPELL pSpell)
 		buffType = ::BUFFTYPE::MeleeProc;
 		return;
 	}
-	if (HasSpellAttrib(pSpell, 360) && pSpell->TargetType==::TARGETTYPE::Self)
+	if (HasSpellAttrib(pSpell, 360) && pSpell->TargetType == ::TARGETTYPE::Self)
 	{
 		strcpy_s(spellCat, "KillShotProc");
 		buffType = ::BUFFTYPE::KillShotProc;
@@ -2587,7 +2595,7 @@ void SpellType(PSPELL pSpell)
 	//renji: call to SpellCategory moved to top
 	if (spellCat != "Unknown") {
 		if (pSpell->TargetType == 6 || pSpell->TargetType == 41) {
-			strcpy_s(spellType, "SelfBuff"); spellTypeOption = ::OPTIONS::SELFBUFF; spellFunc = CheckSelfBuff; return;
+			strcpy_s(spellType, "Buff"); spellTypeOption = ::OPTIONS::BUFF; spellFunc = CheckBuff; return;
 		}
 		if (pSpell->TargetType != 6 && pSpell->TargetType != 41) {
 			strcpy_s(spellType, "Buff"); spellTypeOption = ::OPTIONS::BUFF;  spellFunc = CheckBuff;  return;
@@ -2607,7 +2615,7 @@ bool ValidBen(PSPELL pSpell, PSPAWNINFO pSpawn)
 	if (pSpell->ZoneType == 1 && !outdoor)
 		return false;
 	if (pSpell->SpellType != 0)
-		if (((int)pSpell->ManaCost < GetCharInfo()->pSpawn->GetCurrentMana()  &&  GetCharInfo()->pSpawn->GetMaxMana()>0 || pSpell->ManaCost < 1) && (DistanceToSpawn3D((PSPAWNINFO)pCharSpawn, pSpawn) < pSpell->Range || DistanceToSpawn3D((PSPAWNINFO)pCharSpawn, pSpawn) < pSpell->AERange))
+		if (((int)pSpell->ManaCost < GetCharInfo()->pSpawn->GetCurrentMana() && GetCharInfo()->pSpawn->GetMaxMana()>0 || pSpell->ManaCost < 1) && (DistanceToSpawn3D((PSPAWNINFO)pCharSpawn, pSpawn) < pSpell->Range || DistanceToSpawn3D((PSPAWNINFO)pCharSpawn, pSpawn) < pSpell->AERange))
 			valid = true;
 	return valid;
 }
@@ -2634,7 +2642,7 @@ bool ValidDet(PSPELL pSpell, PSPAWNINFO Target)
 		validDet = false;
 		return validDet;
 	}
-	if (pSpell->TargetType == 5 && !(CastRay(GetCharInfo()->pSpawn, Target->Y, Target->X, Target->Z)) || (int)pSpell->ManaCost > GetCharInfo()->pSpawn->GetCurrentMana() && GetCharInfo()->pSpawn->GetMaxMana() > 0 || DistanceToSpawn3D(GetCharInfo()->pSpawn, Target) > pSpell->Range && pSpell->Range > 0 || DistanceToSpawn3D(GetCharInfo()->pSpawn, Target) > pSpell->AERange && pSpell->Range == 0)
+	if (pSpell->TargetType == 5 && !(CastRay(GetCharInfo()->pSpawn, Target->Y, Target->X, Target->Z)) || (int)pSpell->ManaCost > GetCharInfo()->pSpawn->GetCurrentMana() && GetCharInfo()->pSpawn->GetMaxMana() > 0 || DistanceToSpawn3D(GetCharInfo()->pSpawn, Target) > pSpell->Range&& pSpell->Range > 0 || DistanceToSpawn3D(GetCharInfo()->pSpawn, Target) > pSpell->AERange&& pSpell->Range == 0)
 		validDet = false;
 	return validDet;
 }
@@ -2665,7 +2673,7 @@ void CreateAA()
 		"War Stomp", "Lyrical Prankster", "Enduring Frenzy", "Fleeting Spirit", "Silent Strikes", "Focused Destructive Force", "Ton Po's Stance",
 		"Swift Tails' Chant", "Knee Strike", "Blood Magic", "Companion's Fury", "Heretic's Twincast", "Ferociousness", "Distant Conflagration",
 		"Ligament Slice", "Twisted Shank", "T`Vyl's Resolve", "Spiritual Channeling", "Ward of Destruction", NULL };
-	char szTemp[MAX_STRING] = { 0 }; 
+	char szTemp[MAX_STRING] = { 0 };
 	int aaIndex;
 	PALTABILITY aa;
 	for (int i = 0; szAA[i]; i++) {
@@ -2914,7 +2922,7 @@ void CreateDisc()
 			BotSpell disc;
 			disc.Spell = tempSpell[i];
 			strcpy_s(disc.Name, tempSpell[i]->Name);
-			
+
 			disc.Type = TYPE_DISC;
 			disc.CheckFunc = CheckDisc;
 			disc.SpellTypeOption = ::OPTIONS::DISC;
@@ -3076,6 +3084,125 @@ void CreateImHit()
 		}
 	}
 }
+void CreateInvis()
+{ // Note: These are hardcoded in. I dont think it is good to try to incorporate it other than an auto invis if mob within X radius or on demand only
+	if (!InGameOK())
+		return;
+	PCHAR szInvis[] = { "Group Perfected Invisibility", "Group Silent Presence", "Group Spirit Walk", "Shared Camouflage", "Perfected Invisibility",
+		"Innate Camouflage", "Cover Tracks", "Silent Presence", "Spirit Walk", "Cloak of Shadows",
+		"Shauri's Sonorious Clouding", "Gather Shadows", "Improved Natural Invisibility", NULL };
+	PCHARINFO pChar = GetCharInfo();
+	char szBuffer[MAX_STRING];
+	int aaIndex;
+	_ALTABILITY* aa = nullptr;
+	for (unsigned int i = 0; szInvis[i]; i++)
+	{
+		strcpy_s(szBuffer, szInvis[i]);
+		aaIndex = GetAAIndexByName(szBuffer);
+		if (aaIndex > 0)
+		{
+			aa = pAltAdvManager->GetAAById(aaIndex);
+			if (aa)
+			{
+				if (PSPELL pSpell = GetSpellByID(aa->SpellID))
+				{
+					if (pSpell->TargetType == Single)
+					{
+						invisself = pSpell;
+						BotSpell botspell;
+						botspell.AA = aa;
+						strcpy_s(botspell.Name, szInvis[i]);
+						BuildSpell(botspell);
+						botspell.Use = 0;
+						botspell.Priority = 0;
+						BuildBuff(botspell);
+						WriteChatf("[Buff] Invis \ao[Single]\aw: %s", pSpell->Name);
+					}
+					if (pSpell->TargetType == Self)
+					{
+						invisself = pSpell;
+						BotSpell botspell;
+						botspell.AA = aa;
+						strcpy_s(botspell.Name, szInvis[i]);
+						BuildSpell(botspell);
+						botspell.Use = 0;
+						botspell.Priority = 0;
+						BuildBuff(botspell);
+						WriteChatf("[Buff] Invis \ay[Self]\aw: %s", pSpell->Name);
+					}
+					if (pSpell->TargetType == Group_v2 || pSpell->TargetType == Group_v1)
+					{
+						invisgroup = pSpell;
+						BotSpell botspell;
+						botspell.AA = aa;
+						strcpy_s(botspell.Name, szInvis[i]);
+						BuildSpell(botspell);
+						botspell.Use = 0;
+						botspell.Priority = 0;
+						BuildBuff(botspell);
+						WriteChatf("[Buff] Invis \ap[Group]\aw: %s", pSpell->Name);
+					}
+				}
+			}
+		}
+	}
+}
+void CreateInvisUndead()
+{  // Note: These are hardcoded in. I dont think it is good to try to incorporate it other than an auto invis if mob within X radius or on demand only
+	if (!InGameOK())
+		return;
+	PCHAR szInvisUndead[] = { "Group Perfected Invisibility to Undead", "Innate Invis to Undead", "Cloak of Light", "Fool the Fallen", "Perfected Invisibility to Undead",NULL };
+	PCHARINFO pChar = GetCharInfo();
+	char szBuffer[MAX_STRING];
+	int aaIndex;
+	_ALTABILITY* aa = nullptr;
+	for (unsigned int i = 0; szInvisUndead[i]; i++)
+	{
+		strcpy_s(szBuffer, szInvisUndead[i]);
+		aaIndex = GetAAIndexByName(szBuffer);
+		if (aaIndex > 0)
+		{
+		aa = pAltAdvManager->GetAAById(aaIndex);
+		if (aa)
+			if (PSPELL pSpell = GetSpellByID(aa->SpellID))
+			{
+				if (pSpell->TargetType == Single)
+				{
+					ivuself = pSpell;
+					BotSpell botspell;
+					botspell.AA = aa;
+					strcpy_s(botspell.Name, szInvisUndead[i]);
+					BuildSpell(botspell);
+					botspell.Use = 0;
+					botspell.Priority = 0;
+					WriteChatf("[Buff] IVU \ao[Single]\aw: %s", pSpell->Name);
+				}
+				if (pSpell->TargetType == Self)
+				{
+					ivuself = pSpell;
+					BotSpell botspell;
+					botspell.AA = aa;
+					strcpy_s(botspell.Name, szInvisUndead[i]);
+					BuildSpell(botspell);
+					botspell.Use = 0;
+					botspell.Priority = 0;
+					WriteChatf("[Buff] IVU \ay[Self]\aw: %s", pSpell->Name);
+				}
+				if (pSpell->TargetType == Group_v2 || pSpell->TargetType == Group_v1)
+				{
+					ivugroup = pSpell;
+					BotSpell botspell;
+					botspell.AA = aa;
+					strcpy_s(botspell.Name, szInvisUndead[i]);
+					BuildSpell(botspell);
+					botspell.Use = 0;
+					botspell.Priority = 0;
+					WriteChatf("[Buff] IVU \ap[Group]\aw: %s", pSpell->Name);
+				}
+			}
+		}
+	}
+}
 void CreateJolt()
 {
 	if (!InGameOK())
@@ -3137,6 +3264,54 @@ void CreateKnockback()
 				strcpy_s(spell.SpellType, "Knockback");
 				BuildSpell(spell);
 				vMaster.push_back(spell);
+			}
+		}
+	}
+}
+void CreateLevitate()
+{ // Note: These are hardcoded in. I dont think it is good to try to incorporate it otherwise
+	if (!InGameOK())
+		return;
+	PCHAR szLevitate[] = { "Perfected Dead Men Floating", "Perfected Dead Man Floating", "Group Perfected Levitation","Spirit of Eagles",
+		 "Perfected Levitation", "Group Spirit Walk", "Spirit Walk","Dead Man Floating", NULL };
+	PCHARINFO pChar = GetCharInfo();
+	char szBuffer[MAX_STRING];
+	int aaIndex;
+	_ALTABILITY* aa = nullptr;
+	for (unsigned int i = 0; szLevitate[i]; i++)
+	{
+		strcpy_s(szBuffer, szLevitate[i]);
+		aaIndex = GetAAIndexByName(szBuffer);
+		if (aaIndex > 0)
+		{
+			aa = pAltAdvManager->GetAAById(aaIndex);
+			if (aa)
+			{
+				if (PSPELL pSpell = GetSpellByID(aa->SpellID))
+				{
+					if (pSpell->TargetType == Single)
+					{
+						levitateself = pSpell;
+						BotSpell botspell;
+						botspell.AA = aa;
+						strcpy_s(botspell.Name, szLevitate[i]);
+						BuildSpell(botspell);
+						botspell.Use = 0;
+						botspell.Priority = 0;
+						WriteChatf("[Buff] Levitate \ao[Single]\aw: %s", pSpell->Name);
+					}
+					if (pSpell->TargetType == Group_v2 || pSpell->TargetType == Group_v1)
+					{
+						levitategroup = pSpell;
+						BotSpell botspell;
+						botspell.AA = aa;
+						strcpy_s(botspell.Name, szLevitate[i]);
+						BuildSpell(botspell);
+						botspell.Use = 0;
+						botspell.Priority = 0;
+						WriteChatf("[Buff] Levitate \ap[Group]\aw: %s", pSpell->Name);
+					}
+				}
 			}
 		}
 	}
@@ -3271,7 +3446,7 @@ void CreateRoot()
 	}
 }
 
-void BuildBuff(_BotSpell &spell)
+void BuildBuff(_BotSpell& spell)
 {
 
 	// I need to check vMaster, or do i?
@@ -3281,19 +3456,19 @@ void BuildBuff(_BotSpell &spell)
 	int found = 0;
 	for (int i = 0; i < vSize; i++)
 	{
-		if (vBuff[i].Type == spell.BuffType && spell.BuffType>0)
+		if (vBuff[i].Type == spell.BuffType && spell.BuffType > 0 && spell.BuffType!= MeleeProc && !StrStrIA(spell.Name,"Pred"))
 		{
 			// already have a spell of this type. let's figure out what it is
 			if (spell.Spell->TargetType == ::TARGETTYPE::Self)
 				vBuff[i].Self = spell;
-			if (spell.Spell->TargetType == ::TARGETTYPE::Single|| spell.Spell->TargetType == ::TARGETTYPE::SingleInGroup)
+			if (spell.Spell->TargetType == ::TARGETTYPE::Single || spell.Spell->TargetType == ::TARGETTYPE::SingleInGroup)
 				vBuff[i].Single = spell;
-			if(spell.Spell->TargetType == ::TARGETTYPE::Pet|| spell.Spell->TargetType == ::TARGETTYPE::Pet2)
+			if (spell.Spell->TargetType == ::TARGETTYPE::Pet || spell.Spell->TargetType == ::TARGETTYPE::Pet2)
 				vBuff[i].Pet = spell;
-			if (spell.Spell->TargetType == ::TARGETTYPE::Group_v1|| spell.Spell->TargetType == ::TARGETTYPE::Group_v2|| spell.Spell->TargetType == ::TARGETTYPE::AE_PCv1|| spell.Spell->TargetType == ::TARGETTYPE::AE_PCv2)
+			if (spell.Spell->TargetType == ::TARGETTYPE::Group_v1 || spell.Spell->TargetType == ::TARGETTYPE::Group_v2 || spell.Spell->TargetType == ::TARGETTYPE::AE_PCv1 || spell.Spell->TargetType == ::TARGETTYPE::AE_PCv2)
 				vBuff[i].Group = spell;
 			//WriteChatf("Found, Adding: %s", spell.Name);
-			found++;
+			//found++;
 		}
 	}
 	if (!found)
@@ -3352,9 +3527,26 @@ void BuildBuff(_BotSpell &spell)
 		case ::BUFFTYPE::Retort:		MyBuffs.Retort = buff;			break;
 		case ::BUFFTYPE::KillShotProc:	MyBuffs.KillShotProc = buff;	break;
 		case ::BUFFTYPE::DefensiveProc:	MyBuffs.DefensiveProc = buff;	break;
+		case ::BUFFTYPE::Rune3:			MyBuffs.Rune3 = buff;			break;
+		case ::BUFFTYPE::Preincarnation:MyBuffs.Preincarnation = buff;	break;
 		}
+		spell.SpellTypeOption = ::OPTIONS::BUFF;
+		spell.CheckFunc = CheckBuff;
+		strcpy_s(spell.SpellType, "Buff");
 		//WriteChatf("Adding: %s", spell.Name);
-		vBuff.push_back(buff);
+		//verify it isnt in master already...
+		int found = 0;
+		int vSize = vMaster.size();
+		for (int i = 0; i < vSize; i++)
+		{
+			if (spell.ID == vMaster[i].ID)
+				found++;
+		}
+		if (!found)
+		{
+			vBuff.push_back(buff);
+			vMaster.push_back(spell);
+		}
 	}
 }
 
@@ -3362,17 +3554,22 @@ void CreateBuff()
 {
 	if (!InGameOK())
 		return;
-	PCHAR szSelfBuff[] = { "Preincarnation", "Selo's Sonata", "Sionachie's Crescendo", "Eldritch Rune", /*"Voice of Thule",*/
-		 "Elemental Form", "Cascade of Decay", "Dark Lord's Unity (Azia)", "Pact of the Wurine", "Talisman of Celerity", "Lupine Spirit",
-		"Etherealist's Unity","Divine Protector's Unity","Enticer's Unity",
+	CreateInvis();
+	CreateInvisUndead();
+	CreateLevitate();
+	PCHAR szSelfBuff[] = { "Preincarnation", "Selo's Sonata", "Eldritch Rune", "Spirit of Eagles", /*"Voice of Thule",*/
+		 "Elemental Form", "Cascade of Decay", "Dark Lord's Unity (Azia)", "Dark Lord's Unity (Beza)","Pact of the Wurine", 
+		"Talisman of Celerity", "Lupine Spirit","Etherealist's Unity","Divine Protector's Unity","Enticer's Unity",
 		"Feralist's Unity","Mortifier's Unity","Orator's Unity","Saint's Unity","Thaumaturge's Unity","Transfixer's Unity",
 		"Visionary's Unity","Wildstalker's Unity (Azia)","Wildstalker's Unity (Beza)",  "Wildtender's Unity",	NULL
-		//Broken need to figure out why it crashes with pSpell->Name access   	"Dark Lord's Unity (Beza)",
-	}; //readd "Veil of Mindshadow" slot 11 //Broken need to figure out why it crashes with pSpell->Name access
+	}; //TODO: readd "Veil of Mindshadow" slot 11, removed from game: "Sionachie's Crescendo",
 	vector<PSPELL> vSelfBuff;
 	PCHAR szFamiliar[] = { "E'ci's Icy Familiar", "Druzzil's Mystical Familiar", "Ro's Flaming Familiar", "Improved Familiar",
 		"Kerafyrm's Prismatic Familiar", NULL };
 	//PCHAR szMancy[] = { "Cryomancy", "Arcomancy", "Pyromancy", NULL };//Patch notes 11/20/19 - Wizard - Arcomancy, Cryomancy, and Pyromancy have been consolidated into a toggled passive ability named Trifurcating Magic. Not sure if it used to be toggled or activated.
+	// time for some hard coding
+	int preincarnation = 0, movespeed = 0, rune3 = 0, illusion = 0, cascade = 0, haste = 0, hastebuilt=0, movespeedbuilt=0, preincarnationbuilt=0, illusionbuilt=0;
+	PSPELL phaste, pmovespeed, ppreincarnation, prune3, pillusion, pcascade;
 	for (unsigned int i = 0; szSelfBuff[i]; i++)
 	{
 		for (unsigned long nAbility = 0; nAbility < AA_CHAR_MAX_REAL; nAbility++)
@@ -3386,15 +3583,15 @@ void CreateBuff()
 						if (!StrStrIA(szSelfBuff[i], "'s Unity"))
 						{
 							if (PSPELL pSpell = GetSpellByID(pAbility->SpellID))
-							{
-								if (GetSpellAttrib(pSpell, 0) == 470 || GetSpellAttrib(pSpell, 0) == 374) // casts another spell or more
-								{
-									if (PSPELL temp = CheckTrigger(pSpell, 0))
-										WriteChatf("ALERT: Update AA Buffs - Need to add: AA=%s, Spell=%s", szSelfBuff[i], temp->Name);
-									// i dont think any of the AAs actually do this atm.
-								}
-								else
-								{
+							{   // just do this. there is no reason to drill down as we have manually added the AA in the first place
+								//if ((GetSpellAttrib(pSpell, 0) == 470 || GetSpellAttrib(pSpell, 0) == 374) && !StrStrIA(szSelfBuff[i], "Preincarnation")) // casts another spell or more
+								//{
+								//	if (PSPELL temp = CheckTrigger(pSpell, 0))
+								//		WriteChatf("ALERT: Update AA Buffs - Need to add: AA=%s, Spell=%s", szSelfBuff[i], temp->Name);
+								//	// i dont think any of the AAs actually do this atm.
+								//}
+								//else
+								//{
 									Buff buff;
 									BotSpell botspell;
 									botspell.AA = pAbility;
@@ -3402,7 +3599,50 @@ void CreateBuff()
 									botspell.GroupID = pSpell->SpellGroup;
 									BuildSpell(botspell);
 									BuildBuff(botspell);
-								}
+								// now let's cycle our hardcoded stuff since we only have a few
+									if (!_stricmp(szSelfBuff[i], "Preincarnation"))
+									{
+										preincarnation= GetCharInfo()->pSpawn->Level;
+										preincarnationbuilt = 200; // dont build regular if i have AA
+										ppreincarnation = botspell.Spell;
+										WriteChatf("[Buff] Preincarnation \ay[Self]\aw: %s", botspell.Spell->Name);
+									}
+									if (!_stricmp(szSelfBuff[i], "Selo's Sonata")|| !_stricmp(szSelfBuff[i], "Lupine Spirit") || !_stricmp(szSelfBuff[i], "Spirit of Eagles"))
+									{
+										movespeed = GetCharInfo()->pSpawn->Level;
+										movespeedbuilt = 200; // dont build spell if i have AA
+										pmovespeed = botspell.Spell;
+										if(pmovespeed->TargetType!=Single)
+											WriteChatf("[Buff] MoveSpeed \ap[Group]\aw: %s", botspell.Spell->Name);
+										else
+											WriteChatf("[Buff] MoveSpeed \ao[Single]\aw: %s", botspell.Spell->Name);
+									}
+									if (!_stricmp(szSelfBuff[i], "Eldritch Rune"))
+									{
+										rune3 = GetCharInfo()->pSpawn->Level;
+										prune3 = botspell.Spell;
+										WriteChatf("[Buff] Rune \ay[Self]\aw: %s", botspell.Spell->Name);
+									}
+									if (!_stricmp(szSelfBuff[i], "Elemental Form") || !_stricmp(szSelfBuff[i], "Pact of the Wurine"))
+									{
+										illusion = GetCharInfo()->pSpawn->Level;
+										illusionbuilt = 200; // dont build spell if i have aa
+										pillusion = botspell.Spell;
+										WriteChatf("[Buff] Illusion \ay[Self]\aw: %s", botspell.Spell->Name);
+									}
+									if (!_stricmp(szSelfBuff[i], "Cascade of Decay"))
+									{
+										cascade = GetCharInfo()->pSpawn->Level;
+										pcascade = botspell.Spell;
+										WriteChatf("[Buff] Cascade \ay[Self]\aw: %s", botspell.Spell->Name);
+									}
+									if (!_stricmp(szSelfBuff[i], "Talisman of Celerity"))
+									{
+										haste = 65;
+										hastebuilt = 65;
+										phaste = botspell.Spell;
+										WriteChatf("[Buff] Haste \ap[Group]\aw: %s", botspell.Spell->Name);
+									}
 							}
 						}
 						if (StrStrIA(szSelfBuff[i], "'s Unity"))
@@ -3415,6 +3655,7 @@ void CreateBuff()
 								unityspell.AA = pAbility;
 								UnitySpell = unityspell.Spell;
 								long numeffects = GetSpellNumEffects(pUnitySpell);
+								WriteChatf("[Buff] Unity \ay[Self]\at[Unity]\aw: %s", unityspell.Spell->Name);
 								for (int x = 0; x < numeffects; x++)
 								{
 									if (GetSpellAttrib(pUnitySpell, x) == 470) //pTrigger = (PSPELL)pSpellMgr->GetSpellByGroupAndRank(groupid, pSpell->SpellSubGroup, pSpell->SpellRank, true)
@@ -3447,6 +3688,7 @@ void CreateBuff()
 											botspell.GroupID = pUnitySpell->SpellGroup;
 											botspell.UnitySpell = pUnitySpell;
 											BuildSpell(botspell);
+											botspell.Priority = botspell.Priority+ botspell.Spell->ClassLevel[GetCharInfo()->pSpawn->mActorClient.Class];
 											BuildBuff(botspell);
 										}
 									}
@@ -3478,93 +3720,72 @@ void CreateBuff()
 								strcpy_s(botspell.Name, szFamiliar[i]);
 								BuildSpell(botspell);
 								BuildBuff(botspell);
-								WriteChatf("AA=%s, Spell=%s", szFamiliar[i], GetSpellByID(pAbility->SpellID)->Name);
+								WriteChatf("[Buff] Familiar \ay[Self]\aw: %s", botspell.Spell->Name);
+								//WriteChatf("AA=%s, Spell=%s", szFamiliar[i], GetSpellByID(pAbility->SpellID)->Name);
 							}
 						}
 					}
 				}
 			}
 		}
-	//	/*
-	//	I've commented out this section. Previously the 3 different mancy skills were activated buffs, now they are on an AA that is either Active, or Inactive.
-	//	for (unsigned int i = 0; szMancy[i]; i++)
-	//	{
-	//		for (unsigned long nAbility = 0; nAbility<AA_CHAR_MAX_REAL; nAbility++)
-	//		{
-	//			if (PALTABILITY pAbility = pAltAdvManager->GetAAById(pPCData->GetAlternateAbilityId(nAbility)))
-	//			{
-	//				if (PCHAR pName = pCDBStr->GetString(pAbility->nName, 1, NULL))
-	//				{
-	//					if (!_stricmp(szMancy[i], pName))
-	//					{
-	//						if (GetSpellByID(pAbility->SpellID))
-	//						{
-	//							vSelfBuff.push_back(GetSpellByID(pAbility->SpellID));
-	//							vSelfBuffName.push_back(szMancy[i]);
-	//						}
-	//					}
-	//				}
-	//			}
-	//		}
-	//	}*/
-		/*enum CLASSES { NONE, WAR, CLR, PAL, RNG, SHD, DRU, MNK, BRD, ROG, SHM, NEC, WIZ, MAG, ENC, BST, BER };
-		 enum TARGETTYPE { UNKNOWN, LoS, AE_PCv1, Group_v1, PB_AE, Single, Self, Ignore, Targeted_AE, Animal, Undead, Summoned, Lifetap = 13, 
-		Pet = 14, Corpse, Plant, UberGiants, UberDragons, Targeted_AE_Tap = 20, AE_Undead = 24, AE_Summoned = 25, Hatelist = 32, Hatelist2 = 33, Chest = 34,
-			SpecialMuramites = 35, Caster_PB_PC = 36, Caster_PB_NPC = 37, Pet2 = 38, NoPets = 39, AE_PCv2 = 40, Group_v2 = 41, Directional_AE = 42, SingleInGroup = 43,
-			Beam = 44, FreeTarget = 45, TargetOfTarget = 46, PetOwner = 47, Target_AE_No_Players_Pets = 50
-		};*/
-		/*
-		//long duration buffs
-buffSelfSpellResist,buffSingleSpellResist,buffGroupSpellResist, // might need to break this out by class or resist type since there's so many.
-buffSingleResistCorruption,buffGroupResistCorruption, //maybe?
-buffSelfHybridHP, // pal/sk self hp buffs
-buffSelfConvert, // SK/nec mana conversion
-buffSelfAttack, // SK attack buff
-buffSingleAego, buffGroupAego, buffSingleUnifiedAego, buffGroupUnifiedAego, buffGroupSpellHaste, buffSingleAC, buffGroupAC,//clr
-buffSingleSymbol, buffGroupSymbol, buffSingleUnifiedSymbol, buffGroupUnifiedSymbol, buffSingleSpellHaste, //clr .. 
-buffSingleHaste, buffGrouphaste, buffAAHaste, // shm, enc, bst (single)
-buffSingleSkin, buffGroupSkin, //dru /rng (single only rng)
-buffSelfFocus, //clr/casters
-buffSingleFocus, buffGroupFocus, // shm / bst (group only except for one single spell at level 67)
-buffSingleRegen, buffGroupRegen, // shm/dru rang(single)
-buffSelfClarity, buffSingleClarity, buffGroupClarity, // rng, dru self . enc single/group
-buffSelfPred, buffGroupPred, buffGroupStrength, // rng
-buffGroupBrells, //pal only
-buffGroupSV, buffGroupSE, //bst only
-HybridHP, //not sure if i need this atm
-buffSelfDS, buffSingleDS, buffGroupDS, buffPetDS,
-buffSingleFerocity, buffGroupFerocity, // dont use single if you have group
-// there are a ton of different lines for procs on hit or cast. many classes get 2, sometimes 3
-buffSelfMeleeProc, buffSingleMeleeProc, buffGroupMeleeProc,
-buffSelfMeleeProc2,
-buffSelfSpellProc, buffSingleSpellProc, buffGroupSpellProc,
-buffSelfKillShotProc,
-// misc buffs common across classes
-buffSelfInvis, buffSingleInvis, buffGroupInvis,
-buffSelfIVU, buffSingleIVU, buffGroupIVU,
-buffSelfLevitate, buffSingleLevitate, buffGroupLevitate,
-buffSingleMoveSpeed, buffGroupMoveSpeed,
-//things i might only use if memmed, usually short duration and require getting hit to matter
-buffSelfDefensiveProc, buffSingleDefensiveProc,
-buffSelfRune, buffSingleRune, buffGroupRune,
-buffSelfRune2, buffSingleRune2, buffGroupRune2,
-buffDivineIntervention, //clr
-//things i should only use if memmed.. high reuse timer or extremely short duration or both
-buffSingleRetort, buffSelfDivineAura, buffSingleDivineAura, buffSelfDivineAura2, buffYaulp, buffSingleShining, //clr.. ok clerics.. we get it. you are special
-buffSelfWard, buffSingleWard,
-buffSingleGrowth;// dru/shm
-		*/
-		int skin = 0, aego = 0, symbol = 0, type2 = 0, shielding = 0, clarity = 0, se = 0, haste = 0, regen = 0, pred = 0, ds = 0,
+			/*enum CLASSES { NONE, WAR, CLR, PAL, RNG, SHD, DRU, MNK, BRD, ROG, SHM, NEC, WIZ, MAG, ENC, BST, BER };
+			 enum TARGETTYPE { UNKNOWN, LoS, AE_PCv1, Group_v1, PB_AE, Single, Self, Ignore, Targeted_AE, Animal, Undead, Summoned, Lifetap = 13,
+			Pet = 14, Corpse, Plant, UberGiants, UberDragons, Targeted_AE_Tap = 20, AE_Undead = 24, AE_Summoned = 25, Hatelist = 32, Hatelist2 = 33, Chest = 34,
+				SpecialMuramites = 35, Caster_PB_PC = 36, Caster_PB_NPC = 37, Pet2 = 38, NoPets = 39, AE_PCv2 = 40, Group_v2 = 41, Directional_AE = 42, SingleInGroup = 43,
+				Beam = 44, FreeTarget = 45, TargetOfTarget = 46, PetOwner = 47, Target_AE_No_Players_Pets = 50
+			};*/
+			/*
+			//long duration buffs
+	buffSelfSpellResist,buffSingleSpellResist,buffGroupSpellResist, // might need to break this out by class or resist type since there's so many.
+	buffSingleResistCorruption,buffGroupResistCorruption, //maybe?
+	buffSelfHybridHP, // pal/sk self hp buffs
+	buffSelfConvert, // SK/nec mana conversion
+	buffSelfAttack, // SK attack buff
+	buffSingleAego, buffGroupAego, buffSingleUnifiedAego, buffGroupUnifiedAego, buffGroupSpellHaste, buffSingleAC, buffGroupAC,//clr
+	buffSingleSymbol, buffGroupSymbol, buffSingleUnifiedSymbol, buffGroupUnifiedSymbol, buffSingleSpellHaste, //clr ..
+	buffSingleHaste, buffGrouphaste, buffAAHaste, // shm, enc, bst (single)
+	buffSingleSkin, buffGroupSkin, //dru /rng (single only rng)
+	buffSelfFocus, //clr/casters
+	buffSingleFocus, buffGroupFocus, // shm / bst (group only except for one single spell at level 67)
+	buffSingleRegen, buffGroupRegen, // shm/dru rang(single)
+	buffSelfClarity, buffSingleClarity, buffGroupClarity, // rng, dru self . enc single/group
+	buffSelfPred, buffGroupPred, buffGroupStrength, // rng
+	buffGroupBrells, //pal only
+	buffGroupSV, buffGroupSE, //bst only
+	HybridHP, //not sure if i need this atm
+	buffSelfDS, buffSingleDS, buffGroupDS, buffPetDS,
+	buffSingleFerocity, buffGroupFerocity, // dont use single if you have group
+	// there are a ton of different lines for procs on hit or cast. many classes get 2, sometimes 3
+	buffSelfMeleeProc, buffSingleMeleeProc, buffGroupMeleeProc,
+	buffSelfMeleeProc2,
+	buffSelfSpellProc, buffSingleSpellProc, buffGroupSpellProc,
+	buffSelfKillShotProc,
+	// misc buffs common across classes
+	buffSelfInvis, buffSingleInvis, buffGroupInvis,
+	buffSelfIVU, buffSingleIVU, buffGroupIVU,
+	buffSelfLevitate, buffSingleLevitate, buffGroupLevitate,
+	buffSingleMoveSpeed, buffGroupMoveSpeed,
+	//things i might only use if memmed, usually short duration and require getting hit to matter
+	buffSelfDefensiveProc, buffSingleDefensiveProc,
+	buffSelfRune, buffSingleRune, buffGroupRune,
+	buffSelfRune2, buffSingleRune2, buffGroupRune2,
+	buffDivineIntervention, //clr
+	//things i should only use if memmed.. high reuse timer or extremely short duration or both
+	buffSingleRetort, buffSelfDivineAura, buffSingleDivineAura, buffSelfDivineAura2, buffYaulp, buffSingleShining, //clr.. ok clerics.. we get it. you are special
+	buffSelfWard, buffSingleWard,
+	buffSingleGrowth;// dru/shm
+			*/
+		int skin = 0, aego = 0, symbol = 0, type2 = 0, shielding = 0, clarity = 0, se = 0, regen = 0, pred = 0, ds = 0,
 			rune = 0, rune2 = 0, mana2 = 0, defensive = 0, shroud = 0, horror = 0, fero = 0, call = 0, convert = 0, killshot = 0,
-			hastesingle = 0, claritysingle = 0, regensingle = 0, aegosingle=0, aegounifiedsingle=0,aegogroupunified=0,symbolsingle=0,symbolunifiedsingle=0,
-			meleeprocself=0,meleeprocsingle=0,meleeprocgroup=0,meleeprocself2=0,meleeprocself3,defensivesingle=0, defensiveself=0,spellhastesingle=0,spellhastegroup=0,
-			absorbsingle=0,absorbself=0,absorbgroup=0,
-			symbolunifiedgroup=0, clarityself = 0, ACsingle=0, ACgroup=0, dsself = 0, dssingle = 0, divineintervention = 0, skinsingle=0, focussingle=0, focusgroup=0;
-		PSPELL	pskin, paego, psymbol, ptype2, pshielding, pclarity, pse, phaste, pregen, ppred, pds, prune, prune2, pmana2, pdefensive,
+			hastesingle = 0, claritysingle = 0, regensingle = 0, aegosingle = 0, aegounifiedsingle = 0, aegogroupunified = 0, symbolsingle = 0, symbolunifiedsingle = 0,
+			meleeprocsingle = 0, meleeprocgroup = 0, defensivesingle = 0, defensiveself = 0, spellhastesingle = 0, spellhastegroup = 0,
+			absorbsingle = 0, absorbself = 0, absorbgroup = 0, bstunity = 0,
+			symbolunifiedgroup = 0, clarityself = 0, ACsingle = 0, ACgroup = 0, dsself = 0, dssingle = 0, divineintervention = 0, skinsingle = 0, focussingle = 0, focusgroup = 0;
+		PSPELL	pskin, paego, psymbol, ptype2, pshielding, pclarity, pse, pregen, ppred, pds, prune, prune2, pmana2, pdefensive,
 			pshroud, phorror, pfero, pcall, pconvert, pkillshot, phastesingle, pclaritysingle, pregensingle, paegosingle, paegounifiedsingle, paegogroupunified, psymbolsingle, psymbolunifiedsingle,
-			pmeleeprocself,pmeleeprocsingle,pmeleeprocgroup,pmeleeprocself2,pmeleeprocself3,pdefensivesingle,pdefensiveself,pspellhastesingle,pspellhastegroup,
-			pabsorbself,pabsorbsingle,pabsorbgroup,
-			psymbolunifiedgroup, pclarityself, pACsingle,pACgroup, pdsself, pdssingle, pdivineintervention, pskinsingle, pfocussingle, pfocusgroup;
+			pmeleeprocsingle, pmeleeprocgroup, pdefensivesingle, pdefensiveself, pspellhastesingle, pspellhastegroup,
+			pabsorbself, pabsorbsingle, pabsorbgroup,pbstunity,
+			psymbolunifiedgroup, pclarityself, pACsingle, pACgroup, pdsself, pdssingle, pdivineintervention, pskinsingle, pfocussingle, pfocusgroup;
 		vector<_BotSpell> vMeleeProcs;
 
 		for (unsigned int nSpell = 0; nSpell < NUM_BOOK_SLOTS; nSpell++)
@@ -3572,44 +3793,60 @@ buffSingleGrowth;// dru/shm
 			if (PSPELL pSpell = GetSpellByID(GetCharInfo2()->SpellBook[nSpell]))
 			{
 				long attrib0 = GetSpellAttrib(pSpell, 0);
-				
+
 				if (attrib0 != 33)
 				{
-					if (attrib0 == 85 && pSpell->TargetType==Self) // melee proc
+					if (attrib0 == 85 && pSpell->TargetType == Self && GetCharInfo()->pSpawn->mActorClient.Class != ENC) // melee proc
 					{
 						BotSpell botspell;
 						botspell.Spell = pSpell;
+						botspell.ID = pSpell->ID;
+						strcpy_s(botspell.Name,pSpell->Name);
 						botspell.Priority = pSpell->ClassLevel[GetCharInfo()->pSpawn->mActorClient.Class];
 						vMeleeProcs.push_back(botspell);
 					}
-					if (GetSpellNumEffects(pSpell)>1) // melee proc on slot 1
-						if (GetSpellAttrib(pSpell, 1)==85)
+					if (GetSpellNumEffects(pSpell) > 1 && GetCharInfo()->pSpawn->mActorClient.Class != ENC && pSpell->TargetType == Self) // melee proc on slot 1
+						if (GetSpellAttrib(pSpell, 1) == 85)
 						{
 							BotSpell botspell;
 							botspell.Spell = pSpell;
+							strcpy_s(botspell.Name, pSpell->Name);
+							botspell.ID = pSpell->ID;
 							botspell.Priority = pSpell->ClassLevel[GetCharInfo()->pSpawn->mActorClient.Class];
 							vMeleeProcs.push_back(botspell);
 						}
-					if (attrib0 == 85 && pSpell->TargetType == Single && GetCharInfo()->pSpawn->mActorClient.Class!=BST) // melee proc single.. and idk that i want this for bsts
+					if (attrib0 == 85 && pSpell->TargetType == Single && GetCharInfo()->pSpawn->mActorClient.Class != BST && GetCharInfo()->pSpawn->mActorClient.Class != SHM) // melee proc single.. and idk that i want this for bsts or shm panthers
 					{
-						meleeprocsingle = pSpell->ClassLevel[GetCharInfo()->pSpawn->mActorClient.Class];
-						pmeleeprocsingle = pSpell;
+						if (pSpell->ClassLevel[GetCharInfo()->pSpawn->mActorClient.Class] > meleeprocsingle)
+						{
+							meleeprocsingle = pSpell->ClassLevel[GetCharInfo()->pSpawn->mActorClient.Class];
+							pmeleeprocsingle = pSpell;
+						}
 					}
-					if (attrib0 == 127 && GetCharInfo()->pSpawn->mActorClient.Class ==CLR && pSpell->TargetType==Single) // spell haste single
+					if (GetCharInfo()->pSpawn->mActorClient.Class == BST && StrStrIA(pSpell->Name,"'s Unity")) // bst SV/SE unity
 					{
-						spellhastesingle = pSpell->ClassLevel[GetCharInfo()->pSpawn->mActorClient.Class];
-						pspellhastesingle = pSpell;
+						if (pSpell->ClassLevel[GetCharInfo()->pSpawn->mActorClient.Class] > bstunity)
+						{
+							bstunity = pSpell->ClassLevel[GetCharInfo()->pSpawn->mActorClient.Class];
+							pbstunity = pSpell;
+						}
+					}
+					if (attrib0 == 127 && GetCharInfo()->pSpawn->mActorClient.Class == CLR && pSpell->TargetType == Single) // spell haste single
+					{
+						if (pSpell->ClassLevel[GetCharInfo()->pSpawn->mActorClient.Class] > spellhastesingle)
+						{
+							spellhastesingle = pSpell->ClassLevel[GetCharInfo()->pSpawn->mActorClient.Class];
+							pspellhastesingle = pSpell;
+						}
 					}
 					if (attrib0 == 127 && GetCharInfo()->pSpawn->mActorClient.Class == CLR && pSpell->TargetType == Group_v2) // spell haste group
 					{
-						spellhastegroup = pSpell->ClassLevel[GetCharInfo()->pSpawn->mActorClient.Class];
-						pspellhastegroup = pSpell;
+						if (pSpell->ClassLevel[GetCharInfo()->pSpawn->mActorClient.Class] > spellhastegroup)
+						{
+							spellhastegroup = pSpell->ClassLevel[GetCharInfo()->pSpawn->mActorClient.Class];
+							pspellhastegroup = pSpell;
+						}
 					}
-					//if (attrib0 == 85 && pSpell->TargetType == Single) // melee proc group // i dont think i want panther here.
-					//{
-					//	meleeprocsingle = pSpell->ClassLevel[GetCharInfo()->pSpawn->mActorClient.Class];
-					//	pmeleeprocsingle = pSpell;
-					//}
 					if (pSpell->Category == 95 && pSpell->Subcategory == 6 && pSpell->TargetType == Single) // single clr ward
 					{
 						if (pSpell->ClassLevel[GetCharInfo()->pSpawn->mActorClient.Class] > ACsingle)
@@ -3626,7 +3863,7 @@ buffSingleGrowth;// dru/shm
 							pACgroup = pSpell;
 						}
 					}
-					if ((StrStrIA(pSpell->Name, "Shield of ") || (StrStrIA(pSpell->Name, "Rallied") && StrStrIA(pSpell->Name, "of Vie"))) && pSpell->Category == 125 && pSpell->Subcategory == 62 && pSpell->TargetType==Self) // vie and wiz shields
+					if (StrStrIA(pSpell->Name, "Shield of ") && pSpell->Category == 125 && pSpell->Subcategory == 62 && pSpell->TargetType == Self) // wiz shields
 					{
 						if (pSpell->ClassLevel[GetCharInfo()->pSpawn->mActorClient.Class] > absorbself)
 						{
@@ -3634,7 +3871,7 @@ buffSingleGrowth;// dru/shm
 							pabsorbself = pSpell;
 						}
 					}
-					if ((StrStrIA(pSpell->Name, "Shield of ") || (StrStrIA(pSpell->Name, "Rallied") && StrStrIA(pSpell->Name, "of Vie"))) && pSpell->Category == 125 && pSpell->Subcategory == 62 && pSpell->TargetType == Single) // vie and wiz shields
+					if (StrStrIA(pSpell->Name, "Vie") && pSpell->Category == 125 && pSpell->Subcategory == 62 && pSpell->TargetType == Single) // vie
 					{
 						if (pSpell->ClassLevel[GetCharInfo()->pSpawn->mActorClient.Class] > absorbsingle)
 						{
@@ -3642,7 +3879,7 @@ buffSingleGrowth;// dru/shm
 							pabsorbsingle = pSpell;
 						}
 					}
-					if ((StrStrIA(pSpell->Name, "Shield of ") || (StrStrIA(pSpell->Name, "Rallied") && StrStrIA(pSpell->Name, "of Vie"))) && pSpell->Category == 125 && pSpell->Subcategory == 62 && pSpell->TargetType==Group_v2)
+					if (StrStrIA(pSpell->Name, "Vie") && pSpell->Category == 125 && pSpell->Subcategory == 62 && pSpell->TargetType == Group_v1) // rallied vie
 					{
 						if (pSpell->ClassLevel[GetCharInfo()->pSpawn->mActorClient.Class] > absorbgroup)
 						{
@@ -3658,10 +3895,17 @@ buffSingleGrowth;// dru/shm
 							pfero = pSpell;
 						}
 					}
-					if (pSpell->Subcategory == 59 && pSpell->Category == 79 && pSpell->TargetType == 6 || pSpell->Subcategory == 17 && GetSpellAttribX(pSpell, 1) == 15 && GetSpellBaseX(pSpell, 1) > 0 && GetSpellDuration(pSpell, (PSPAWNINFO)pLocalPlayer) > 0
-						|| pSpell->Subcategory == 59 && GetSpellAttribX(pSpell, 2) == 15 && GetSpellBaseX(pSpell, 2) > 2)
+					if (pSpell->Subcategory == 59 && pSpell->Category == 79 && pSpell->TargetType == 6 || pSpell->Subcategory == 17 && GetSpellAttribX(pSpell, 1) == 15 && GetSpellBaseX(pSpell, 1) > 0 && GetSpellDuration(pSpell, (PSPAWNINFO)pLocalPlayer) > 0 )
 					{
-						if (pSpell->ClassLevel[GetCharInfo()->pSpawn->mActorClient.Class] > mana2)
+						if (pSpell->ClassLevel[GetCharInfo()->pSpawn->mActorClient.Class] > mana2 && GetCharInfo()->pSpawn->mActorClient.Class != RNG && GetCharInfo()->pSpawn->mActorClient.Class != DRU)
+						{
+							mana2 = pSpell->ClassLevel[GetCharInfo()->pSpawn->mActorClient.Class];
+							pmana2 = pSpell;
+						}
+					}
+					if (pSpell->Subcategory == 44 && pSpell->Category == 79 && StrStrIA(pSpell->Name," Guardian")||pSpell->Subcategory == 59 && GetSpellAttribX(pSpell, 2) == 15 && GetSpellBaseX(pSpell, 2) > 2) // this dupes above line just to save room, was having detection issues
+					{
+						if (pSpell->ClassLevel[GetCharInfo()->pSpawn->mActorClient.Class] > mana2&& GetCharInfo()->pSpawn->mActorClient.Class != RNG && GetCharInfo()->pSpawn->mActorClient.Class != DRU)
 						{
 							mana2 = pSpell->ClassLevel[GetCharInfo()->pSpawn->mActorClient.Class];
 							pmana2 = pSpell;
@@ -3699,7 +3943,7 @@ buffSingleGrowth;// dru/shm
 							phorror = pSpell;
 						}
 					}
-					if (HasSpellAttrib(pSpell, 323) && GetSpellDuration(pSpell, (PSPAWNINFO)pLocalPlayer) > 60 && pSpell->TargetType==Self) // self defensive proc
+					if (HasSpellAttrib(pSpell, 323) && GetSpellDuration(pSpell, (PSPAWNINFO)pLocalPlayer) > 60 && pSpell->TargetType == Self) // self defensive proc
 					{
 						if (pSpell->ClassLevel[GetCharInfo()->pSpawn->mActorClient.Class] > defensiveself)
 						{
@@ -3779,7 +4023,7 @@ buffSingleGrowth;// dru/shm
 							pskin = pSpell;
 						}
 					}
-					if (pSpell->Subcategory == 87 && pSpell->TargetType==Self) // self focus/shielding
+					if (pSpell->Subcategory == 87 && pSpell->TargetType == Self) // self focus/shielding
 					{
 						if (pSpell->ClassLevel[GetCharInfo()->pSpawn->mActorClient.Class] > shielding)
 						{
@@ -3787,7 +4031,7 @@ buffSingleGrowth;// dru/shm
 							pshielding = pSpell;
 						}
 					}
-					if (pSpell->Subcategory == 87 && pSpell->TargetType==Single) // single focus
+					if (pSpell->Subcategory == 87 && pSpell->TargetType == Single) // single focus
 					{
 						if (pSpell->ClassLevel[GetCharInfo()->pSpawn->mActorClient.Class] > focussingle)
 						{
@@ -3795,7 +4039,7 @@ buffSingleGrowth;// dru/shm
 							pfocussingle = pSpell;
 						}
 					}
-					if (pSpell->Subcategory == 87 && pSpell->TargetType==Group_v2) // group focus
+					if (pSpell->Subcategory == 87 && pSpell->TargetType == Group_v2) // group focus
 					{
 						if (pSpell->ClassLevel[GetCharInfo()->pSpawn->mActorClient.Class] > focusgroup)
 						{
@@ -3859,15 +4103,16 @@ buffSingleGrowth;// dru/shm
 							ppred = pSpell;
 						}
 					}
-					if (pSpell->Subcategory == 112 && pSpell->TargetType == Group_v2 && StrStrIA(pSpell->Name,"Unified")) //unified group symbol
+					if (pSpell->Subcategory == 112 && pSpell->TargetType == Group_v1 && StrStrIA(pSpell->Name, "Unified")) //unified group symbol
 					{
+						
 						if (pSpell->ClassLevel[GetCharInfo()->pSpawn->mActorClient.Class] > symbolunifiedgroup)
 						{
 							symbolunifiedgroup = pSpell->ClassLevel[GetCharInfo()->pSpawn->mActorClient.Class];
 							psymbolunifiedgroup = pSpell;
 						}
 					}
-					if (pSpell->Subcategory == 112 && pSpell->TargetType == Group_v2 && !StrStrIA(pSpell->Name, "Unified"))
+					if (pSpell->Subcategory == 112 && pSpell->TargetType == Group_v1 && !StrStrIA(pSpell->Name, "Unified"))
 					{
 						if (pSpell->ClassLevel[GetCharInfo()->pSpawn->mActorClient.Class] > symbol) // group symbol
 						{
@@ -3923,7 +4168,7 @@ buffSingleGrowth;// dru/shm
 							pdsself = pSpell;
 						}
 					}
-					if (pSpell->Subcategory == 21 && pSpell->Category == 125 && pSpell->TargetType == Single && GetCharInfo()->pSpawn->mActorClient.Class!=WIZ && pSpell->SpellType!=0) // single ds
+					if (pSpell->Subcategory == 21 && pSpell->Category == 125 && pSpell->TargetType == Single && GetCharInfo()->pSpawn->mActorClient.Class != WIZ && GetCharInfo()->pSpawn->mActorClient.Class != ENC && pSpell->SpellType != 0) // single ds
 					{
 						if (pSpell->ClassLevel[GetCharInfo()->pSpawn->mActorClient.Class] > dssingle)
 						{
@@ -3957,7 +4202,7 @@ buffSingleGrowth;// dru/shm
 			strcpy_s(vMeleeProcs[0].Name, vMeleeProcs[0].Spell->Name);
 			BuildSpell(vMeleeProcs[0]);
 			BuildBuff(vMeleeProcs[0]);
-			WriteChatf("MeleeProc \ay[Self]\aw: %s", vMeleeProcs[0].Name);
+			WriteChatf("[Buff] MeleeProc \ay[Self]\aw: %s", vMeleeProcs[0].Name);
 			if (vMeleeProcs.size() > 1)
 			{
 				if (vMeleeProcs[1].Priority > (vMeleeProcs[0].Priority - 5)) // if second proc is still within last 5 spells of first, let's use it because it is a different line
@@ -3965,7 +4210,7 @@ buffSingleGrowth;// dru/shm
 					strcpy_s(vMeleeProcs[1].Name, vMeleeProcs[1].Spell->Name);
 					BuildSpell(vMeleeProcs[1]);
 					BuildBuff(vMeleeProcs[1]);
-					WriteChatf("MeleeProc2 \ay[Self]\aw: %s", vMeleeProcs[1].Name);
+					WriteChatf("[Buff] MeleeProc2 \ay[Self]\aw: %s", vMeleeProcs[1].Name);
 				}
 			}
 			if (vMeleeProcs.size() > 2)
@@ -3975,10 +4220,9 @@ buffSingleGrowth;// dru/shm
 					strcpy_s(vMeleeProcs[2].Name, vMeleeProcs[2].Spell->Name);
 					BuildSpell(vMeleeProcs[2]);
 					BuildBuff(vMeleeProcs[2]);
-					WriteChatf("MeleeProc3 \ay[Self]\aw: %s", vMeleeProcs[2].Name);
+					WriteChatf("[Buff] MeleeProc3 \ay[Self]\aw: %s", vMeleeProcs[2].Name);
 				}
 			}
-
 		}
 		if (shroud)
 		{
@@ -3987,6 +4231,7 @@ buffSingleGrowth;// dru/shm
 			strcpy_s(spell.Name, pshroud->Name);
 			BuildSpell(spell);
 			BuildBuff(spell);
+			WriteChatf("[Buff] Shroud \ay[Self]\aw: %s", pshroud->Name);
 		}
 		if (horror)
 		{
@@ -3995,6 +4240,7 @@ buffSingleGrowth;// dru/shm
 			strcpy_s(spell.Name, phorror->Name);
 			BuildSpell(spell);
 			BuildBuff(spell);
+			WriteChatf("[Buff] Horror \ay[Self]\aw: %s", phorror->Name);
 		}
 		if (call)
 		{
@@ -4003,6 +4249,7 @@ buffSingleGrowth;// dru/shm
 			strcpy_s(spell.Name, pcall->Name);
 			BuildSpell(spell);
 			BuildBuff(spell);
+			WriteChatf("[Buff] AttackBuff \ay[Self]\aw: %s", pcall->Name);
 		}
 		if (convert)
 		{
@@ -4011,7 +4258,7 @@ buffSingleGrowth;// dru/shm
 			strcpy_s(spell.Name, pconvert->Name);
 			BuildSpell(spell);
 			BuildBuff(spell);
-			WriteChatf("Convert \ay[Self]\aw: %s", pconvert->Name);
+			WriteChatf("[Buff] Convert \ay[Self]\aw: %s", pconvert->Name);
 		}
 		if (fero)
 		{
@@ -4020,10 +4267,10 @@ buffSingleGrowth;// dru/shm
 			strcpy_s(spell.Name, pfero->Name);
 			BuildSpell(spell);
 			BuildBuff(spell);
-			if(pfero->TargetType==Single)
-				WriteChatf("Fero \ay[Single]\aw: %s", pfero->Name);
+			if (pfero->TargetType == Single)
+				WriteChatf("[Buff] Fero \ay[Single]\aw: %s", pfero->Name);
 			else
-				WriteChatf("Fero \ap[Group]\aw: %s", pfero->Name);
+				WriteChatf("[Buff] Fero \ap[Group]\aw: %s", pfero->Name);
 		}
 		if (aego)
 		{
@@ -4031,8 +4278,9 @@ buffSingleGrowth;// dru/shm
 			spell.Spell = paego;
 			strcpy_s(spell.Name, paego->Name);
 			BuildSpell(spell);
+			spell.Priority=spell.Priority + 20;
 			BuildBuff(spell);
-			WriteChatf("Aego \ap[Group]\aw: %s", paego->Name);
+			WriteChatf("[Buff] Aego \ap[Group]\aw: %s", paego->Name);
 		}
 		if (aegosingle)
 		{
@@ -4041,7 +4289,7 @@ buffSingleGrowth;// dru/shm
 			strcpy_s(spell.Name, paegosingle->Name);
 			BuildSpell(spell);
 			BuildBuff(spell);
-			WriteChatf("Aego \ao[Single]\aw: %s", paegosingle->Name);
+			WriteChatf("[Buff] Aego \ao[Single]\aw: %s", paegosingle->Name);
 		}
 		if (aegogroupunified)
 		{
@@ -4049,8 +4297,9 @@ buffSingleGrowth;// dru/shm
 			spell.Spell = paegogroupunified;
 			strcpy_s(spell.Name, paegogroupunified->Name);
 			BuildSpell(spell);
+			spell.Priority = spell.Priority + 30;
 			BuildBuff(spell);
-			WriteChatf("Aego \ap[Group]\at[Unified]\aw: %s", paegogroupunified->Name);
+			WriteChatf("[Buff] Aego \ap[Group]\at[Unified]\aw: %s", paegogroupunified->Name);
 		}
 		if (aegounifiedsingle)
 		{
@@ -4058,8 +4307,9 @@ buffSingleGrowth;// dru/shm
 			spell.Spell = paegounifiedsingle;
 			strcpy_s(spell.Name, paegounifiedsingle->Name);
 			BuildSpell(spell);
+			spell.Priority = spell.Priority + 10;
 			BuildBuff(spell);
-			WriteChatf("Aego \ao[Single]\at[Unified]\aw: %s", paegounifiedsingle->Name);
+			WriteChatf("[Buff] Aego \ao[Single]\at[Unified]\aw: %s", paegounifiedsingle->Name);
 		}
 		if (spellhastesingle)
 		{
@@ -4068,7 +4318,7 @@ buffSingleGrowth;// dru/shm
 			strcpy_s(spell.Name, pspellhastesingle->Name);
 			BuildSpell(spell);
 			BuildBuff(spell);
-			WriteChatf("SpellHaste \ao[Single]\aw: %s", pspellhastesingle->Name);
+			WriteChatf("[Buff] SpellHaste \ao[Single]\aw: %s", pspellhastesingle->Name);
 		}
 		if (spellhastegroup)
 		{
@@ -4077,7 +4327,7 @@ buffSingleGrowth;// dru/shm
 			strcpy_s(spell.Name, pspellhastegroup->Name);
 			BuildSpell(spell);
 			BuildBuff(spell);
-			WriteChatf("SpellHaste \ap[Group]\aw: %s", pspellhastegroup->Name);
+			WriteChatf("[Buff] SpellHaste \ap[Group]\aw: %s", pspellhastegroup->Name);
 		}
 		if (ACsingle)
 		{
@@ -4086,7 +4336,7 @@ buffSingleGrowth;// dru/shm
 			strcpy_s(spell.Name, pACsingle->Name);
 			BuildSpell(spell);
 			BuildBuff(spell);
-			WriteChatf("Shielding \ao[Single]\aw: %s", pACsingle->Name);
+			WriteChatf("[Buff] Shielding \ao[Single]\aw: %s", pACsingle->Name);
 		}
 		if (ACgroup)
 		{
@@ -4095,7 +4345,7 @@ buffSingleGrowth;// dru/shm
 			strcpy_s(spell.Name, pACgroup->Name);
 			BuildSpell(spell);
 			BuildBuff(spell);
-			WriteChatf("Shielding \ap[Group]\aw: %s", pACgroup->Name);
+			WriteChatf("[Buff] Shielding \ap[Group]\aw: %s", pACgroup->Name);
 		}
 		if (absorbself)
 		{
@@ -4104,7 +4354,7 @@ buffSingleGrowth;// dru/shm
 			strcpy_s(spell.Name, pabsorbself->Name);
 			BuildSpell(spell);
 			BuildBuff(spell);
-			WriteChatf("Absorb \ay[Self]\aw: %s", pabsorbself->Name);
+			WriteChatf("[Buff] Absorb \ay[Self]\aw: %s", pabsorbself->Name);
 		}
 		if (absorbsingle)
 		{
@@ -4113,7 +4363,7 @@ buffSingleGrowth;// dru/shm
 			strcpy_s(spell.Name, pabsorbsingle->Name);
 			BuildSpell(spell);
 			BuildBuff(spell);
-			WriteChatf("Mitigate \ao[Single]\aw: %s", pabsorbsingle->Name);
+			WriteChatf("[Buff] Mitigate \ao[Single]\aw: %s", pabsorbsingle->Name);
 		}
 		if (absorbgroup)
 		{
@@ -4122,7 +4372,7 @@ buffSingleGrowth;// dru/shm
 			strcpy_s(spell.Name, pabsorbgroup->Name);
 			BuildSpell(spell);
 			BuildBuff(spell);
-			WriteChatf("Mitigate \ap[Group]\aw: %s", pabsorbgroup->Name);
+			WriteChatf("[Buff] Mitigate \ap[Group]\aw: %s", pabsorbgroup->Name);
 		}
 		if (skinsingle)
 		{
@@ -4131,7 +4381,7 @@ buffSingleGrowth;// dru/shm
 			strcpy_s(spell.Name, pskinsingle->Name);
 			BuildSpell(spell);
 			BuildBuff(spell);
-			WriteChatf("Skin \ao[Single]\aw: %s", pskinsingle->Name);
+			WriteChatf("[Buff] Skin \ao[Single]\aw: %s", pskinsingle->Name);
 		}
 		if (skin)
 		{
@@ -4140,16 +4390,45 @@ buffSingleGrowth;// dru/shm
 			strcpy_s(spell.Name, pskin->Name);
 			BuildSpell(spell);
 			BuildBuff(spell);
-			WriteChatf("Skin \ap[Group]\aw: %s", pskin->Name);
+			WriteChatf("[Buff] Skin \ap[Group]\aw: %s", pskin->Name);
 		}
-		if (symbol)
+		if (symbolsingle)
+		{
+			BotSpell spell;
+			spell.Spell = psymbolsingle;
+			strcpy_s(spell.Name, psymbolsingle->Name);
+			BuildSpell(spell);
+			BuildBuff(spell);
+			WriteChatf("[Buff] Symbol \ao[Single]\aw: %s", psymbolsingle->Name);
+		}
+		if (symbolunifiedsingle)
+		{
+			BotSpell spell;
+			spell.Spell = psymbolunifiedsingle;
+			strcpy_s(spell.Name, psymbolunifiedsingle->Name);
+			BuildSpell(spell);
+			spell.Priority = spell.Priority + 10;
+			BuildBuff(spell);
+			WriteChatf("[Buff] Symbol \ao[Single]\at[Unified]\aw: %s", psymbolunifiedsingle->Name);
+		}
+		if (symbolunifiedgroup)
+		{
+			BotSpell spell;
+			spell.Spell = psymbolunifiedgroup;
+			strcpy_s(spell.Name, psymbolunifiedgroup->Name);
+			BuildSpell(spell);
+			spell.Priority = spell.Priority + 30;
+			BuildBuff(spell);
+			WriteChatf("[Buff] Symbol \ap[Group]\at[Unified]\aw: %s", psymbolunifiedgroup->Name);
+		}
+		if (symbol>symbolunifiedgroup) // this check is because single target symbol was phased out with introduction of unified. so if unified is present dont use an older version of single target
 		{
 			BotSpell spell;
 			spell.Spell = psymbol;
 			strcpy_s(spell.Name, psymbol->Name);
 			BuildSpell(spell);
 			BuildBuff(spell);
-			WriteChatf("Symbol \ap[Group]\aw: %s", psymbol->Name);
+			WriteChatf("[Buff] Symbol \ap[Group]\aw: %s", psymbol->Name);
 		}
 		if (clarityself)
 		{
@@ -4158,7 +4437,7 @@ buffSingleGrowth;// dru/shm
 			strcpy_s(spell.Name, pclarityself->Name);
 			BuildSpell(spell);
 			BuildBuff(spell);
-			WriteChatf("Clarity \ay[Self]\aw: %s", pclarityself->Name);
+			WriteChatf("[Buff] Clarity \ay[Self]\aw: %s", pclarityself->Name);
 		}
 		if (claritysingle)
 		{
@@ -4167,7 +4446,7 @@ buffSingleGrowth;// dru/shm
 			strcpy_s(spell.Name, pclaritysingle->Name);
 			BuildSpell(spell);
 			BuildBuff(spell);
-			WriteChatf("Clarity \ao[Single]\aw: %s", pclaritysingle->Name);
+			WriteChatf("[Buff] Clarity \ao[Single]\aw: %s", pclaritysingle->Name);
 		}
 		if (clarity)
 		{
@@ -4176,7 +4455,7 @@ buffSingleGrowth;// dru/shm
 			strcpy_s(spell.Name, pclarity->Name);
 			BuildSpell(spell);
 			BuildBuff(spell);
-			WriteChatf("Clarity \ap[Group]\aw: %s", pclarity->Name);
+			WriteChatf("[Buff] Clarity \ap[Group]\aw: %s", pclarity->Name);
 		}
 		if (se)
 		{
@@ -4185,7 +4464,7 @@ buffSingleGrowth;// dru/shm
 			strcpy_s(spell.Name, pse->Name);
 			BuildSpell(spell);
 			BuildBuff(spell);
-			WriteChatf("SE \ap[Group]\aw: %s", pse->Name);
+			WriteChatf("[Buff] SE \ap[Group]\aw: %s", pse->Name);
 		}
 		if (hastesingle)
 		{
@@ -4194,16 +4473,37 @@ buffSingleGrowth;// dru/shm
 			strcpy_s(spell.Name, phastesingle->Name);
 			BuildSpell(spell);
 			BuildBuff(spell);
-			WriteChatf("Haste \ao[Single]\aw: %s", phastesingle->Name);
+			WriteChatf("[Buff] Haste \ao[Single]\aw: %s", phastesingle->Name);
 		}
-		if (haste)
+		if (haste>hastebuilt) // one off for AA celerity
 		{
 			BotSpell spell;
 			spell.Spell = phaste;
 			strcpy_s(spell.Name, phaste->Name);
 			BuildSpell(spell);
 			BuildBuff(spell);
-			WriteChatf("Haste \ap[Group]\aw: %s", phaste->Name);
+			WriteChatf("[Buff] Haste \ap[Group]\aw: %s", spell.Name); // different because of AA celerity
+		}
+		if (preincarnation > preincarnationbuilt)
+		{
+			BotSpell spell;
+			spell.Spell = ppreincarnation;
+			strcpy_s(spell.Name, phaste->Name);
+			BuildSpell(spell);
+			BuildBuff(spell);
+			WriteChatf("[Buff] Preincarnation \ay[Self]\aw: %s", spell.Name); 
+		}
+		if (movespeed > movespeedbuilt)
+		{
+			BotSpell spell;
+			spell.Spell = pmovespeed;
+			strcpy_s(spell.Name, pmovespeed->Name);
+			BuildSpell(spell);
+			BuildBuff(spell);
+			if(pmovespeed->TargetType!=Single)
+				WriteChatf("[Buff] MoveSpeed \ag[Group]\aw: %s", spell.Name);
+			else
+				WriteChatf("[Buff] MoveSpeed \ao[Single]\aw: %s", spell.Name);
 		}
 		if (shielding)
 		{
@@ -4212,33 +4512,25 @@ buffSingleGrowth;// dru/shm
 			strcpy_s(spell.Name, pshielding->Name);
 			BuildSpell(spell);
 			BuildBuff(spell);
-			WriteChatf("Shielding \ay[Self]\aw: %s", pshielding->Name);
+			WriteChatf("[Buff] Shielding \ay[Self]\aw: %s", pshielding->Name);
 		}
-		if (focussingle)
+		if (focussingle && (!StrStr(pfocussingle->Name,"Alladnu")|| GetCharInfo()->pSpawn->Level<71))
 		{
 			BotSpell spell;
 			spell.Spell = pfocussingle;
 			strcpy_s(spell.Name, pfocussingle->Name);
 			BuildSpell(spell);
 			BuildBuff(spell);
-			WriteChatf("Focus \ao[Single]\aw: %s", pfocussingle->Name);
+			WriteChatf("[Buff] Focus \ao[Single]\aw: %s", pfocussingle->Name);
 		}
-		if (focussingle)
-		{
-			BotSpell spell;
-			spell.Spell = pfocussingle;
-			strcpy_s(spell.Name, pfocussingle->Name);
-			BuildSpell(spell);
-			BuildBuff(spell);
-			WriteChatf("Focus \ao[Single]\aw: %s", pfocussingle->Name);
-		}if (focusgroup)
+		if (focusgroup)
 		{
 			BotSpell spell;
 			spell.Spell = pfocusgroup;
 			strcpy_s(spell.Name, pfocusgroup->Name);
 			BuildSpell(spell);
 			BuildBuff(spell);
-			WriteChatf("Focus \ap[Group]\aw: %s", pfocusgroup->Name);
+			WriteChatf("[Buff] Focus \ap[Group]\aw: %s", pfocusgroup->Name);
 		}
 		if (type2)
 		{
@@ -4246,8 +4538,9 @@ buffSingleGrowth;// dru/shm
 			spell.Spell = ptype2;
 			strcpy_s(spell.Name, ptype2->Name);
 			BuildSpell(spell);
+			spell.Priority = spell.Priority + 20;
 			BuildBuff(spell);
-			WriteChatf("HybridHP \ap[Group]\aw: %s", ptype2->Name);
+			WriteChatf("[Buff] HybridHP \ap[Group]\aw: %s", ptype2->Name);
 		}
 		if (regensingle)
 		{
@@ -4256,7 +4549,7 @@ buffSingleGrowth;// dru/shm
 			strcpy_s(spell.Name, pregensingle->Name);
 			BuildSpell(spell);
 			BuildBuff(spell);
-			WriteChatf("Regen \ao[Single]\aw: %s", pregensingle->Name);
+			WriteChatf("[Buff] Regen \ao[Single]\aw: %s", pregensingle->Name);
 		}
 		if (regen)
 		{
@@ -4265,7 +4558,7 @@ buffSingleGrowth;// dru/shm
 			strcpy_s(spell.Name, pregen->Name);
 			BuildSpell(spell);
 			BuildBuff(spell);
-			WriteChatf("Regen \ap[Group]\aw: %s", pregen->Name);
+			WriteChatf("[Buff] Regen \ap[Group]\aw: %s", pregen->Name);
 		}
 		if (pred)
 		{
@@ -4273,8 +4566,9 @@ buffSingleGrowth;// dru/shm
 			spell.Spell = ppred;
 			strcpy_s(spell.Name, ppred->Name);
 			BuildSpell(spell);
+			spell.Priority = spell.Priority + 20;
 			BuildBuff(spell);
-			WriteChatf("Predator \ap[Group]\aw: %s", ppred->Name);
+			WriteChatf("[Buff] Predator \ap[Group]\aw: %s", ppred->Name);
 		}
 		if (dsself)
 		{
@@ -4283,7 +4577,7 @@ buffSingleGrowth;// dru/shm
 			strcpy_s(spell.Name, pdsself->Name);
 			BuildSpell(spell);
 			BuildBuff(spell);
-			WriteChatf("DS \ay[Self]\aw: %s", pdsself->Name);
+			WriteChatf("[Buff] DS \ay[Self]\aw: %s", pdsself->Name);
 		}
 		if (dssingle)
 		{
@@ -4292,7 +4586,7 @@ buffSingleGrowth;// dru/shm
 			strcpy_s(spell.Name, pdssingle->Name);
 			BuildSpell(spell);
 			BuildBuff(spell);
-			WriteChatf("DS \ao[Single]\aw: %s", pdssingle->Name);
+			WriteChatf("[Buff] DS \ao[Single]\aw: %s", pdssingle->Name);
 		}
 		if (ds)
 		{
@@ -4301,7 +4595,7 @@ buffSingleGrowth;// dru/shm
 			strcpy_s(spell.Name, pds->Name);
 			BuildSpell(spell);
 			BuildBuff(spell);
-			WriteChatf("DS \ap[Group]\aw: %s", pds->Name);
+			WriteChatf("[Buff] DS \ap[Group]\aw: %s", pds->Name);
 		}
 		if (rune)
 		{
@@ -4310,6 +4604,10 @@ buffSingleGrowth;// dru/shm
 			strcpy_s(spell.Name, prune->Name);
 			BuildSpell(spell);
 			BuildBuff(spell);
+			if(prune->TargetType==Self)
+				WriteChatf("[Buff] Rune \ay[Self]\aw: %s", prune->Name);
+			if (prune->TargetType == Single)
+				WriteChatf("[Buff] Rune \ao[Single]\aw: %s", prune->Name);
 		}
 		/*if (rune2)
 		{
@@ -4326,6 +4624,7 @@ buffSingleGrowth;// dru/shm
 			strcpy_s(spell.Name, pmana2->Name);
 			BuildSpell(spell);
 			BuildBuff(spell);
+			WriteChatf("[Buff] ManaRegen \ay[Self]\aw: %s", pmana2->Name);
 		}
 		if (defensiveself)
 		{
@@ -4333,8 +4632,10 @@ buffSingleGrowth;// dru/shm
 			spell.Spell = pdefensiveself;
 			strcpy_s(spell.Name, pdefensiveself->Name);
 			BuildSpell(spell);
+			spell.ForceCast = 0;
+			spell.UseInCombat = 1;
 			BuildBuff(spell);
-			WriteChatf("DefensiveProc \ay[Self]\aw: %s", pdefensiveself->Name);
+			WriteChatf("[Buff] DefensiveProc \ay[Self]\aw: %s", pdefensiveself->Name);
 		}
 		if (defensivesingle)
 		{
@@ -4342,8 +4643,10 @@ buffSingleGrowth;// dru/shm
 			spell.Spell = pdefensivesingle;
 			strcpy_s(spell.Name, pdefensivesingle->Name);
 			BuildSpell(spell);
+			spell.ForceCast = 0;
+			spell.UseInCombat = 1;
 			BuildBuff(spell);
-			WriteChatf("DefensiveProc \ao[Single]\aw: %s", pdefensivesingle->Name);
+			WriteChatf("[Buff] DefensiveProc \ao[Single]\aw: %s", pdefensivesingle->Name);
 		}
 		if (defensive)
 		{
@@ -4351,8 +4654,10 @@ buffSingleGrowth;// dru/shm
 			spell.Spell = pdefensive;
 			strcpy_s(spell.Name, pdefensive->Name);
 			BuildSpell(spell);
+			spell.ForceCast = 0;
+			spell.UseInCombat = 1;
 			BuildBuff(spell);
-			WriteChatf("DefensiveProc \ap[Group]\aw: %s", pdefensive->Name);
+			WriteChatf("[Buff] DefensiveProc \ap[Group]\aw: %s", pdefensive->Name);
 		}
 		if (killshot)
 		{
@@ -4361,29 +4666,29 @@ buffSingleGrowth;// dru/shm
 			strcpy_s(spell.Name, pkillshot->Name);
 			BuildSpell(spell);
 			BuildBuff(spell);
-			WriteChatf("KillshotProc \ay[Self]\aw: %s", pkillshot->Name);
+			WriteChatf("[Buff] KillshotProc \ay[Self]\aw: %s", pkillshot->Name);
 		}
 	}
 
 	int vSize = vBuff.size();
 	//WriteChatf("%d", vSize);
-	for (int i = 0; i < vSize; i++)
-	{
-		/*if (vBuff[i].Unity)
-		{
-			PCHAR pName = pCDBStr->GetString(vBuff[i].Unity->nName, 1, NULL);
-			WriteChatf("UNITY: %s", pName);
-		}*/
-		if (vBuff[i].Self.ID)
-			WriteChatf("SELF: %s (%s) %d", vBuff[i].Self.Name, vBuff[i].Self.SpellCat,i);
-		if (vBuff[i].Single.ID)
-			WriteChatf("SINGLE: %s (%s) %d", vBuff[i].Single.Name, vBuff[i].Single.SpellCat,i);
-		if (vBuff[i].Group.ID)
-			WriteChatf("GROUP: %s (%s) %d", vBuff[i].Group.Name, vBuff[i].Group.SpellCat,i);
-		if (vBuff[i].Pet.ID)
-			WriteChatf("PET: %s (%s) %d", vBuff[i].Pet.Name, vBuff[i].Pet.SpellCat,i);
-		// WriteChatf("%s (%s)", vBuff[i].BotSpell.Name, vBuff[i].Category);
-	}
+	//for (int i = 0; i < vSize; i++)
+	//{
+	//	/*if (vBuff[i].Unity)
+	//	{
+	//		PCHAR pName = pCDBStr->GetString(vBuff[i].Unity->nName, 1, NULL);
+	//		WriteChatf("UNITY: %s", pName);
+	//	}*/
+	//	if (vBuff[i].Self.ID)
+	//		WriteChatf("SELF: %s (%s) %d", vBuff[i].Self.Name, vBuff[i].Self.SpellCat, i);
+	//	if (vBuff[i].Single.ID)
+	//		WriteChatf("SINGLE: %s (%s) %d", vBuff[i].Single.Name, vBuff[i].Single.SpellCat, i);
+	//	if (vBuff[i].Group.ID)
+	//		WriteChatf("GROUP: %s (%s) %d", vBuff[i].Group.Name, vBuff[i].Group.SpellCat, i);
+	//	if (vBuff[i].Pet.ID)
+	//		WriteChatf("PET: %s (%s) %d", vBuff[i].Pet.Name, vBuff[i].Pet.SpellCat, i);
+	//	// WriteChatf("%s (%s)", vBuff[i].BotSpell.Name, vBuff[i].Category);
+	//}
 }
 void CreateSnare()
 {
@@ -4471,45 +4776,45 @@ void ValidateBuffs()
 		WriteChatf("SV line detected");
 	if (MyBuffs.Focus.Type)
 		WriteChatf("Focus line detected");
-			/*case ::BUFFTYPE::Charge:		MyBuffs.Charge = buff;			break;
-			case ::BUFFTYPE::Skin:			MyBuffs.Skin = buff;			break;
-			case ::BUFFTYPE::Focus:			MyBuffs.Focus = buff;			break;
-			case ::BUFFTYPE::Regen:			MyBuffs.Regen = buff;			break;
-			case ::BUFFTYPE::Symbol:		MyBuffs.Symbol = buff;			break;
-			case ::BUFFTYPE::Clarity:		MyBuffs.Clarity = buff;			break;
-			case ::BUFFTYPE::Pred:			MyBuffs.Pred = buff;			break;
-			case ::BUFFTYPE::Strength:		MyBuffs.Strength = buff;		break;
-			case ::BUFFTYPE::Brells:		MyBuffs.Brells = buff;			break;
-			case ::BUFFTYPE::SV:			MyBuffs.SV = buff;				break;
-			case ::BUFFTYPE::SE:			MyBuffs.SE = buff;				break;
-			case ::BUFFTYPE::Growth:		MyBuffs.Growth = buff;			break;
-			case ::BUFFTYPE::Rune:			MyBuffs.Rune = buff;			break;
-			case ::BUFFTYPE::Rune2:			MyBuffs.Rune2 = buff;			break;
-			case ::BUFFTYPE::Shining:		MyBuffs.Shining = buff;			break;
-			case ::BUFFTYPE::SpellHaste:	MyBuffs.SpellHaste = buff;		break;
-			case ::BUFFTYPE::MeleeProc:		MyBuffs.MeleeProc = buff;		break;
-			case ::BUFFTYPE::SpellProc:		MyBuffs.SpellProc = buff;		break;
-			case ::BUFFTYPE::Invis:			MyBuffs.Invis = buff;			break;
-			case ::BUFFTYPE::IVU:			MyBuffs.IVU = buff;				break;
-			case ::BUFFTYPE::Levitate:		MyBuffs.Levitate = buff;		break;
-			case ::BUFFTYPE::MoveSpeed:		MyBuffs.MoveSpeed = buff;		break;
-			case ::BUFFTYPE::Haste:			MyBuffs.Haste = buff;			break;
-			case ::BUFFTYPE::DS1:			MyBuffs.DS1 = buff;				break;
-			case ::BUFFTYPE::DS2:			MyBuffs.DS2 = buff;				break;
-			case ::BUFFTYPE::DS3:			MyBuffs.DS3 = buff;				break;
-			case ::BUFFTYPE::DS4:			MyBuffs.DS4 = buff;				break;
-			case ::BUFFTYPE::DS5:			MyBuffs.DS5 = buff;				break;
-			case ::BUFFTYPE::DS6:			MyBuffs.DS6 = buff;				break;
-			case ::BUFFTYPE::DS7:			MyBuffs.DS7 = buff;				break;
-			case ::BUFFTYPE::DS8:			MyBuffs.DS8 = buff;				break;
-			case ::BUFFTYPE::DS9:			MyBuffs.DS9 = buff;				break;
-			case ::BUFFTYPE::DS10:			MyBuffs.DS10 = buff;			break;
-			case ::BUFFTYPE::DS11:			MyBuffs.DS11 = buff;			break;
-			case ::BUFFTYPE::DS12:			MyBuffs.DS12 = buff;			break;
-			case ::BUFFTYPE::Fero:			MyBuffs.Fero = buff;			break;
-			case ::BUFFTYPE::Retort:		MyBuffs.Retort = buff;			break;
-			case ::BUFFTYPE::KillShotProc:	MyBuffs.KillShotProc = buff;	break;
-			case ::BUFFTYPE::DefensiveProc:	MyBuffs.DefensiveProc = buff;	break;*/
+	/*case ::BUFFTYPE::Charge:		MyBuffs.Charge = buff;			break;
+	case ::BUFFTYPE::Skin:			MyBuffs.Skin = buff;			break;
+	case ::BUFFTYPE::Focus:			MyBuffs.Focus = buff;			break;
+	case ::BUFFTYPE::Regen:			MyBuffs.Regen = buff;			break;
+	case ::BUFFTYPE::Symbol:		MyBuffs.Symbol = buff;			break;
+	case ::BUFFTYPE::Clarity:		MyBuffs.Clarity = buff;			break;
+	case ::BUFFTYPE::Pred:			MyBuffs.Pred = buff;			break;
+	case ::BUFFTYPE::Strength:		MyBuffs.Strength = buff;		break;
+	case ::BUFFTYPE::Brells:		MyBuffs.Brells = buff;			break;
+	case ::BUFFTYPE::SV:			MyBuffs.SV = buff;				break;
+	case ::BUFFTYPE::SE:			MyBuffs.SE = buff;				break;
+	case ::BUFFTYPE::Growth:		MyBuffs.Growth = buff;			break;
+	case ::BUFFTYPE::Rune:			MyBuffs.Rune = buff;			break;
+	case ::BUFFTYPE::Rune2:			MyBuffs.Rune2 = buff;			break;
+	case ::BUFFTYPE::Shining:		MyBuffs.Shining = buff;			break;
+	case ::BUFFTYPE::SpellHaste:	MyBuffs.SpellHaste = buff;		break;
+	case ::BUFFTYPE::MeleeProc:		MyBuffs.MeleeProc = buff;		break;
+	case ::BUFFTYPE::SpellProc:		MyBuffs.SpellProc = buff;		break;
+	case ::BUFFTYPE::Invis:			MyBuffs.Invis = buff;			break;
+	case ::BUFFTYPE::IVU:			MyBuffs.IVU = buff;				break;
+	case ::BUFFTYPE::Levitate:		MyBuffs.Levitate = buff;		break;
+	case ::BUFFTYPE::MoveSpeed:		MyBuffs.MoveSpeed = buff;		break;
+	case ::BUFFTYPE::Haste:			MyBuffs.Haste = buff;			break;
+	case ::BUFFTYPE::DS1:			MyBuffs.DS1 = buff;				break;
+	case ::BUFFTYPE::DS2:			MyBuffs.DS2 = buff;				break;
+	case ::BUFFTYPE::DS3:			MyBuffs.DS3 = buff;				break;
+	case ::BUFFTYPE::DS4:			MyBuffs.DS4 = buff;				break;
+	case ::BUFFTYPE::DS5:			MyBuffs.DS5 = buff;				break;
+	case ::BUFFTYPE::DS6:			MyBuffs.DS6 = buff;				break;
+	case ::BUFFTYPE::DS7:			MyBuffs.DS7 = buff;				break;
+	case ::BUFFTYPE::DS8:			MyBuffs.DS8 = buff;				break;
+	case ::BUFFTYPE::DS9:			MyBuffs.DS9 = buff;				break;
+	case ::BUFFTYPE::DS10:			MyBuffs.DS10 = buff;			break;
+	case ::BUFFTYPE::DS11:			MyBuffs.DS11 = buff;			break;
+	case ::BUFFTYPE::DS12:			MyBuffs.DS12 = buff;			break;
+	case ::BUFFTYPE::Fero:			MyBuffs.Fero = buff;			break;
+	case ::BUFFTYPE::Retort:		MyBuffs.Retort = buff;			break;
+	case ::BUFFTYPE::KillShotProc:	MyBuffs.KillShotProc = buff;	break;
+	case ::BUFFTYPE::DefensiveProc:	MyBuffs.DefensiveProc = buff;	break;*/
 }
 #pragma endregion CreateRoutines
 
@@ -4861,10 +5166,10 @@ void Configure(PCHAR szCustomIni, int force)
 	long Races = GetCharInfo2()->Race;
 	long Level = GetCharInfo2()->Level;
 	sprintf_s(INIFileName, "%s\\%s_%s.ini", gszINIPath, EQADDR_SERVERNAME, GetCharInfo()->Name);
-	sprintf_s(INISection, "%s_%d_%s_%s", PLUGIN_NAME, Level, pEverQuest->GetRaceDesc(Races), pEverQuest->GetClassDesc(Class));
+	sprintf_s(INISection, "%s_%d_%s_%s", MYPLUGIN_NAME, Level, pEverQuest->GetRaceDesc(Races), pEverQuest->GetClassDesc(Class));
 	Shrouded = GetCharInfo2()->Shrouded;
 	if (!Shrouded)
-		INISection[strlen(PLUGIN_NAME)] = 0;
+		INISection[strlen(MYPLUGIN_NAME)] = 0;
 	strcpy_s(tempINI, INISection);
 	if (szCustomIni != nullptr) {
 		_strlwr_s(szCustomIni, MAX_STRING);
@@ -4875,10 +5180,10 @@ void Configure(PCHAR szCustomIni, int force)
 	GetPrivateProfileString(INISection, "Debugging", NULL, DEBUG_DUMPFILE, MAX_STRING, INIFileName);//log to file?
 	WritePrivateProfileString(INISection, "Debugging", DEBUG_DUMPFILE, INIFileName);
 	DefaultGem = GetPrivateProfileInt(INISection, "DefaultGem", 1, INIFileName); //default gem to cast with
-	if (EQADDR_SUBSCRIPTIONTYPE && *EQADDR_SUBSCRIPTIONTYPE) 
+	if (EQADDR_SUBSCRIPTIONTYPE && *EQADDR_SUBSCRIPTIONTYPE)
 	{
 		DWORD dwsubtype = *(DWORD*)EQADDR_SUBSCRIPTIONTYPE;
-		if (dwsubtype) 
+		if (dwsubtype)
 		{
 			BYTE subtype = *(BYTE*)dwsubtype;
 			switch (subtype)
@@ -4888,7 +5193,7 @@ void Configure(PCHAR szCustomIni, int force)
 			case 1:
 				break;
 			case 2:
-				bGoldStatus=true;
+				bGoldStatus = true;
 				break;
 			}
 		}
@@ -4970,7 +5275,7 @@ void Create()
 	CreateRoot();
 	CreateSnare();
 	CreateSwarm();
-	ValidateBuffs();
+	//ValidateBuffs();
 }
 #pragma endregion create
 
@@ -4986,7 +5291,7 @@ void BotCommand(PSPAWNINFO pChar, PCHAR szLine)
 	CustomSpells();				//create all the ini stuff first so it sets precedent
 	Create();					//create all the unknown AAs/discs/items
 	CheckMemmedSpells();		//create any remaining unknown spells that you have memmed
-	if(vMaster.size())
+	if (vMaster.size())
 		SortSpellVector(vMaster);
 	ConfigureLoaded = true;
 	if (strlen(szLine) != 0)
@@ -5015,17 +5320,17 @@ void ListCommand(PSPAWNINFO pChar, PCHAR szLine)
 	int vSize = vMaster.size();
 	for (int i = 0; i < vSize; i++)
 	{
-		if (!_stricmp(vMaster[i].If, "0")||vMaster[i].Use==0)
-			WriteChatf("\arSpell%d: [%s] %s, Pri: %d (Disabled)", i, vMaster[i].SpellType, vMaster[i].Name,  vMaster[i].Priority);
+		if (!_stricmp(vMaster[i].If, "0") || vMaster[i].Use == 0)
+			WriteChatf("\arSpell%d: [%s] %s, Pri: %d (Disabled)", i, vMaster[i].SpellType, vMaster[i].Name, vMaster[i].Priority);
 		else
 		{
-			if(vMaster[i].UseInCombat)
+			if (vMaster[i].UseInCombat)
 				WriteChatf("\aoSpell%d: \aw[%s] %s%s, \aw Pri: %d", i, vMaster[i].SpellType, vMaster[i].Color, vMaster[i].Name, vMaster[i].Priority);
 			else
 				WriteChatf("\aoSpell%d: \ag[%s] %s%s, \aw Pri: %d", i, vMaster[i].SpellType, vMaster[i].Color, vMaster[i].Name, vMaster[i].Priority);
 		}
-			
-		if (_stricmp(vMaster[i].If,"1") && _stricmp(vMaster[i].If, "0"))
+
+		if (_stricmp(vMaster[i].If, "1") && _stricmp(vMaster[i].If, "0"))
 			WriteChatf("\aySpell%dIf: \aw%s", i, vMaster[i].If);
 	}
 }
