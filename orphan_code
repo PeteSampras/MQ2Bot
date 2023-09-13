@@ -1,28 +1,29 @@
 
-#define CAST_SUCCESS      0
-#define CAST_INTERRUPTED  1
-#define CAST_RESIST       2
-#define CAST_COLLAPSE     3
-#define CAST_RECOVER      4
-#define CAST_FIZZLE       5
-#define CAST_STANDING     6
-#define CAST_STUNNED      7
-#define CAST_INVISIBLE    8
-#define CAST_NOTREADY     9
-#define CAST_OUTOFMANA   10
-#define CAST_OUTOFRANGE  11
-#define CAST_NOTARGET    12
-#define CAST_CANNOTSEE   13
-#define CAST_COMPONENTS  14
-#define CAST_OUTDOORS    15
-#define CAST_TAKEHOLD    16
-#define CAST_IMMUNE      17
-#define CAST_DISTRACTED  18
-#define CAST_ABORTED     19
-#define CAST_UNKNOWN     20
-#define CAST_IMMUNE_RUN  21
-#define CAST_IMMUNE_MEZ  22
-#define CAST_IMMUNE_SLOW 23
+#define CAST_SUCCESS       		  0
+#define CAST_INTERRUPTED   		  1
+#define CAST_RESIST        		  2
+#define CAST_COLLAPSE      		  3
+#define CAST_RECOVER       		  4
+#define CAST_FIZZLE        		  5
+#define CAST_STANDING      		  6
+#define CAST_STUNNED       		  7
+#define CAST_INVISIBLE     		  8
+#define CAST_NOTREADY      		  9
+#define CAST_OUTOFMANA    		  10
+#define CAST_OUTOFRANGE   		  11
+#define CAST_NOTARGET     		  12
+#define CAST_CANNOTSEE    		  13
+#define CAST_COMPONENTS   		  14
+#define CAST_OUTDOORS     		  15
+#define CAST_TAKEHOLD     		  16
+#define CAST_IMMUNE       		  17
+#define CAST_DISTRACTED   		  18
+#define CAST_ABORTED      		  19
+#define CAST_UNKNOWN      		  20
+#define CAST_IMMUNE_RUN   		  21
+#define CAST_IMMUNE_MEZ   		  22
+#define CAST_IMMUNE_SLOW 		  23
+#define CAST_PARTIALLY_SUCCESSFUL 	  24
 
 #define FLAG_COMPLETE     0
 #define FLAG_REQUEST     -1
@@ -314,6 +315,9 @@ VOID AddSpellTimer(int SpawnID, PSPELL pSpell, int TickE, bool ignoreMod)
 		now = now + 100000;
 		break;
 	case CAST_TAKEHOLD: // CAST_TAKEHOLD
+		now = now + CalcDuration(pSpell);
+		break;
+	case CAST_PARTIALLY_SUCCESSFUL // CAST_PARTIALLY_SUCCESFUL
 		now = now + CalcDuration(pSpell);
 		break;
 	default: // Unknown
