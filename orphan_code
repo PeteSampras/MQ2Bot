@@ -23,6 +23,7 @@
 #define CAST_IMMUNE_RUN  21
 #define CAST_IMMUNE_MEZ  22
 #define CAST_IMMUNE_SLOW 23
+#defin	CAST_PARTIALLY_SUCCESSFUL 24
 
 #define FLAG_COMPLETE     0
 #define FLAG_REQUEST     -1
@@ -315,6 +316,9 @@ VOID AddSpellTimer(int SpawnID, PSPELL pSpell, int TickE, bool ignoreMod)
 		break;
 	case CAST_TAKEHOLD: // CAST_TAKEHOLD
 		now = now + CalcDuration(pSpell);
+		break;
+	case CAST_PARTIALLY_SUCCESSFUL: // CAST_PARTIALLY_SUCCESSFUL
+		now = now + CalcDuration(pSpell/2); // take spell duration wait for half of it and recast for possible successful cast
 		break;
 	default: // Unknown
 		return;
