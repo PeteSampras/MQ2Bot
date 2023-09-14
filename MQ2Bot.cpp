@@ -484,7 +484,7 @@ PCHAR ChatColors[] = { "\ay", "\a-y", "\ao", "\a-o", "\ag", "\a-g", "\ab", "\a-b
 PCHAR EQBCColors[] = { "[+y+]", "[+Y+]", "[+o+]", "[+O+]", "[+g+]", "[+G+]", "[+b+]", "[+B+]", "[+r+]", "[+R+]", "[+t+]",
 "[+T+]", "[+m+]", "[+M+]", "[+p+]", "[+P+]", "[+w+]", "[+W+]", "[+x+]", "[+X+]", "[+u+]", "[+U+]", NULL };
 PCHAR cast_status[] = { "SUCCESS","INTERRUPTED","RESIST","COLLAPSE","RECOVER","FIZZLE","STANDING","STUNNED","INVISIBLE","NOTREADY",
-"OUTOFMANA","OUTOFRANGE","NOTARGET","CANNOTSEE","COMPONENTS","OUTDOORS","TAKEHOLD","IMMUNE","DISTRACTED","ABORTED",	"UNKNOWN",	"IMMUNE_RUN", "IMMUNE_MEZ","IMMUNE_SLOW",NULL };
+"OUTOFMANA","OUTOFRANGE","NOTARGET","CANNOTSEE","COMPONENTS","OUTDOORS","TAKEHOLD","IMMUNE","DISTRACTED","ABORTED",	"UNKNOWN",	"IMMUNE_RUN", "IMMUNE_MEZ","IMMUNE_SLOW", "Partially_SUCCESSFUL", NULL };
 PCHAR DefaultSection[] = { "AA", "Aggro","Aura","Bard","Buff","Call","Charm","Clickies", "ClickyBuffs","Items",
 "ClickyNukes","Debuff","Dot","Endurance","Fade","FightBuff","Grab","Heal","HealPet","HealToT",
 "ImHit","Jolt","KnockBack","Lifetap","MainTankBuff","Mana","Nuke","NukeToT","Pet","Rez",
